@@ -796,4 +796,21 @@ window.gsToggle = () => gsExpand(document.getElementById('get-started').classLis
 
 // ── Init ──────────────────────────────────────────────────────────────────
 (async () => {
-  els.tr
+  els.transcodeBtn.disabled = true;
+  els.statusLabel.textContent = 'Connecting…';
+
+  // Independent 5s fallback: if still not connected, scroll to Get Started
+  const fallback = setTimeout(() => {
+    if (!state.connected) showNotConnected();
+  }, 5000);
+
+  const ok = await checkServer(state.serverUrl);
+  clearTimeout(fallback);
+
+  if (ok) {
+    showConnected(state.serverUrl);
+  } else {
+    showNotConnected();
+  }
+})();
+

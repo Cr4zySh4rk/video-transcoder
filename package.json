@@ -1,7 +1,7 @@
 {
   "name": "videoforge",
-  "version": "1.1.0",
-  "description": "Web-based video transcoder — H.264/H.265/VP9/AV1, hardware acceleration, audio controls, batch processing",
+  "version": "1.1.5",
+  "description": "Web-based video transcoder \u2014 H.264/H.265/VP9/AV1, hardware acceleration, audio controls, batch processing",
   "main": "electron/main.js",
   "author": "Cr4zySh4rk",
   "license": "MIT",
@@ -14,7 +14,7 @@
   "build": {
     "appId": "com.cr4zysh4rk.videoforge",
     "productName": "VideoForge",
-    "copyright": "Copyright © 2024 Cr4zySh4rk",
+    "copyright": "Copyright \u00a9 2024 Cr4zySh4rk",
     "directories": {
       "output": "release"
     },
@@ -31,14 +31,29 @@
     "asar": true,
     "win": {
       "target": [
-        { "target": "nsis",     "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "electron/icons/icon.png"
     },
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["universal"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
       ],
       "icon": "electron/icons/icon.icns",
       "category": "public.app-category.utilities",
@@ -47,8 +62,18 @@
     },
     "linux": {
       "target": [
-        { "target": "tar.gz",   "arch": ["x64"] },
-        { "target": "AppImage", "arch": ["x64"] }
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "electron/icons/",
       "category": "AudioVideo"
@@ -60,10 +85,20 @@
     },
     "publish": null,
     "asarUnpack": [
-      "electron/preload.js",
+      "electron/**/*",
+      "server.js",
       "docs/**/*",
       "node_modules/ffmpeg-static/**",
-      "node_modules/ffprobe-static/**"
+      "node_modules/ffprobe-static/**",
+      "node_modules/express/**",
+      "node_modules/multer/**",
+      "node_modules/socket.io/**",
+      "node_modules/socket.io-adapter/**",
+      "node_modules/socket.io-parser/**",
+      "node_modules/engine.io/**",
+      "node_modules/engine.io-parser/**",
+      "node_modules/ws/**",
+      "node_modules/uuid/**"
     ]
   },
   "dependencies": {

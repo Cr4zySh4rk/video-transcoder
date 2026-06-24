@@ -167,5 +167,65 @@ function createWindow() {
   }
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
+  // Open external links in the default browser instead of inside Electron
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
 
-  // Open external lin
+  // Intercept navigations away from localhost / file://
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const isLocal = url.startsWith('http://localhost:') || url.startsWith('file://');
+    if (!isLocal) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+
+  mainWindow.on('closed', () => { mainWindow = null; });
+}
+
+// ── App lifecycle ─────────────────────────────────────────────────────────
+app.whenReady().then(async () => {
+  try {
+    await startServer();
+  } catch (e) {
+    console.error('[main] Server failed to start:', e.message);
+  }
+  createWindow();
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+});
+
+app.on('will-quit', () => {
+  if (serverProcess) {
+    serverProcess.kill();
+    serverProcess = null;
+  }
+});
+
+// ── IPC handlers ──────────────────────────────────────────────────────────
+
+// Folder picker (used by destination selector in web UI)
+ipcMain.handle('pick-folder', async () => {
+  if (!mainWindow) return null;
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Select Output Folder',
+  });
+  return canceled ? null : filePaths[0];
+});
+
+// Open a path in the system file manager
+ipcMain.handle('open-path', async (_, folderPath) => {
+  await shell.openPath(folderPath);
+});
+
+// Return the actual server port (used by preload to inject window.electronAPI.serverPort)
+ipcMain.handle('get-server-port', () => actualPort);

@@ -473,4 +473,123 @@ app.post('/api/transcode', (req, res) => {
         job.status = 'error';
         io.to(jobId).emit('error', { jobId, message: `FFmpeg exited with code ${code}` });
       }
- 
+    });
+    job.process = proc;
+  }
+});
+
+// ── Download ──────────────────────────────────────────────────────────────
+app.get('/api/download/:filename', (req, res) => {
+  const filePath = path.join(OUTPUT_DIR, path.basename(req.params.filename));
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+  res.download(filePath);
+});
+
+// ── Cancel single job ─────────────────────────────────────────────────────
+app.post('/api/cancel/:jobId', (req, res) => {
+  const job = jobs.get(req.params.jobId);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  if (job.process) { job.process.kill('SIGKILL'); job.process = null; }
+  job.status = 'cancelled';
+  res.json({ jobId: req.params.jobId, status: 'cancelled' });
+});
+
+// ── Batch upload ──────────────────────────────────────────────────────────
+const batchUpload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 * 1024 } });
+app.post('/api/batch-upload', batchUpload.array('videos'), (req, res) => {
+  if (!req.files || req.files.length === 0)
+    return res.status(400).json({ error: 'No files uploaded' });
+  const batchId = uuidv4();
+  const items = req.files.map(file => {
+    const jobId = uuidv4();
+    jobs.set(jobId, {
+      inputPath:    file.path,
+      outputPath:   null,
+      process:      null,
+      status:       'uploaded',
+      originalName: file.originalname,
+      batchId,
+    });
+    return { jobId, filename: file.originalname };
+  });
+  res.json({ batchId, items });
+});
+
+// ── Batch transcode ───────────────────────────────────────────────────────
+app.post('/api/batch-transcode', express.json(), async (req, res) => {
+  const { batchId, jobIds, transcodeOpts = {} } = req.body || {};
+  if (!batchId || !Array.isArray(jobIds) || jobIds.length === 0)
+    return res.status(400).json({ error: 'batchId and jobIds required' });
+
+  res.json({ batchId, status: 'started', total: jobIds.length });
+
+  // Process sequentially — emit socket events to the batch room
+  let completed = 0;
+  for (let i = 0; i < jobIds.length; i++) {
+    const jobId = jobIds[i];
+    const job   = jobs.get(jobId);
+    if (!job) { io.to(batchId).emit('batch:file-error', { index: i }); continue; }
+
+    io.to(batchId).emit('batch:file-start', { index: i, jobId });
+
+    const outDir  = OUTPUT_DIR;
+    try { fs.mkdirSync(outDir, { recursive: true }); } catch {}
+
+    const opts = {
+      ...transcodeOpts,
+      inputPath:  job.inputPath,
+      outputPath: makeOutputPath(job.originalName, transcodeOpts.encoder || 'libx264', transcodeOpts.container || 'mp4', outDir),
+    };
+    job.outputPath = opts.outputPath;
+    job.status     = 'running';
+
+    await new Promise(resolve => {
+      const args = buildTranscodeArgs(opts);
+      const proc = runFFmpeg(args, jobId, code => {
+        if (code === 0) {
+          job.status = 'done';
+          completed++;
+          const dlUrl = `/api/download/${path.basename(opts.outputPath)}`;
+          io.to(batchId).emit('batch:file-done', { index: i, downloadUrl: dlUrl });
+          io.to(batchId).emit('batch:progress',  { index: i, percent: 100 });
+        } else {
+          job.status = 'error';
+          io.to(batchId).emit('batch:file-error', { index: i });
+        }
+        resolve();
+      });
+      job.process = proc;
+    });
+  }
+
+  io.to(batchId).emit('batch:done', { batchId, total: completed });
+});
+
+// ── Socket.io rooms ───────────────────────────────────────────────────────
+io.on('connection', socket => {
+  socket.on('join', roomId => {
+    if (roomId) socket.join(roomId);
+  });
+});
+
+// ── Start server ──────────────────────────────────────────────────────────
+const portReady = new Promise((resolve, reject) => {
+  function tryListen(port) {
+    server.listen(port, '0.0.0.0')
+      .on('listening', () => {
+        console.log(`[server] listening on http://localhost:${port}`);
+        resolve(port);
+      })
+      .on('error', err => {
+        if (err.code === 'EADDRINUSE' && port < (parseInt(process.env.PORT || '3000') + 10)) {
+          console.warn(`[server] port ${port} in use, trying ${port + 1}`);
+          tryListen(port + 1);
+        } else {
+          reject(err);
+        }
+      });
+  }
+  tryListen(parseInt(process.env.PORT || '3000', 10));
+});
+
+module.exports = { portReady };

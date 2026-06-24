@@ -30,72 +30,8 @@
   <!-- ── Main ───────────────────────────────────────────────────────── -->
   <main>
 
-    <!-- Setup / Connect Banner -->
-    <div id="connect-banner">
-      <h3>🚀 Local Server Required</h3>
-      <p>VideoForge uses your machine's CPU/GPU for transcoding. You need to run the local server once — it stays open in the background. This page connects to it automatically.</p>
-
-      <!-- OS Setup Steps -->
-      <div id="setup-steps">
-        <div style="margin-bottom:14px;display:flex;gap:8px">
-          <button class="btn btn-ghost" id="os-win" onclick="showOS('win')">Windows</button>
-          <button class="btn btn-ghost" id="os-mac" onclick="showOS('mac')">macOS</button>
-          <button class="btn btn-ghost" id="os-lin" onclick="showOS('lin')">Linux</button>
-        </div>
-
-        <div class="setup-guide" id="guide-win" style="display:none">
-          <div class="step-list">
-            <div class="step"><span class="step-num">1</span><div>Install <strong>Node.js</strong> from <a href="https://nodejs.org" target="_blank">nodejs.org</a></div></div>
-            <div class="step"><span class="step-num">2</span><div>Install <strong>FFmpeg</strong> — download from <a href="https://ffmpeg.org/download.html" target="_blank">ffmpeg.org</a> and add to PATH</div></div>
-            <div class="step"><span class="step-num">3</span>
-              <div>
-                Download &amp; run the launcher:
-                <br/><button class="btn btn-primary" style="margin-top:8px" onclick="dlFile('https://raw.githubusercontent.com/Cr4zySh4rk/video-transcoder/main/launch-windows.bat','launch-windows.bat')">⬇ Download launch-windows.bat</button>
-              </div>
-            </div>
-            <div class="step"><span class="step-num">4</span><div>The server opens a console window. Keep it running, then use this page normally.</div></div>
-          </div>
-        </div>
-
-        <div class="setup-guide" id="guide-mac" style="display:none">
-          <div class="step-list">
-            <div class="step"><span class="step-num">1</span><div>Install <strong>Node.js</strong>: <code>brew install node</code></div></div>
-            <div class="step"><span class="step-num">2</span><div>Install <strong>FFmpeg</strong>: <code>brew install ffmpeg</code></div></div>
-            <div class="step"><span class="step-num">3</span>
-              <div>
-                Download &amp; run the launcher:
-                <br/><button class="btn btn-primary" style="margin-top:8px" onclick="dlFile('https://raw.githubusercontent.com/Cr4zySh4rk/video-transcoder/main/launch-mac.sh','launch-mac.sh')">⬇ Download launch-mac.sh</button>
-                <br/><code style="font-size:11px;opacity:.7">chmod +x launch-mac.sh &amp;&amp; ./launch-mac.sh</code>
-              </div>
-            </div>
-            <div class="step"><span class="step-num">4</span><div>A Terminal window opens. Keep it running, then use this page normally.</div></div>
-          </div>
-        </div>
-
-        <div class="setup-guide" id="guide-lin" style="display:none">
-          <div class="step-list">
-            <div class="step"><span class="step-num">1</span><div>Install Node.js: <code>sudo apt install nodejs npm</code></div></div>
-            <div class="step"><span class="step-num">2</span><div>Install FFmpeg: <code>sudo apt install ffmpeg</code></div></div>
-            <div class="step"><span class="step-num">3</span>
-              <div>
-                Download &amp; run the launcher:
-                <br/><button class="btn btn-primary" style="margin-top:8px" onclick="dlFile('https://raw.githubusercontent.com/Cr4zySh4rk/video-transcoder/main/launch-linux.sh','launch-linux.sh')">⬇ Download launch-linux.sh</button>
-                <br/><code style="font-size:11px;opacity:.7">chmod +x launch-linux.sh &amp;&amp; ./launch-linux.sh</code>
-              </div>
-            </div>
-            <div class="step"><span class="step-num">4</span><div>The server starts in your terminal. Keep it running, then use this page normally.</div></div>
-          </div>
-        </div>
-      </div>
-
-      <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
-        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">Or enter custom server URL:</label>
-        <div class="server-row">
-          <input id="server-url-input" type="text" placeholder="http://localhost:3000" spellcheck="false" />
-          <button class="btn btn-primary" id="connect-btn">Connect</button>
-        </div>
-      </div>
-    </div>
+    <!-- connect-banner intentionally empty — logic handled by Get Started section below -->
+    <div id="connect-banner" style="display:none"></div>
 
     <!-- Mode tabs -->
     <div class="mode-tabs">
@@ -345,4 +281,75 @@
           macOS
         </button>
         <button class="gs-tab" id="gs-lin" onclick="gsOS('lin')">
-          <svg width="14" height="14" viewBox="0 0 24 
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0a12 12 0 1 0 0 24A12 12 0 0 0 12 0zm-.5 5.5c.8 0 1.5.7 1.5 1.5s-.7 1.5-1.5 1.5S10 7.8 10 7s.7-1.5 1.5-1.5zM17 18H7v-1l2-1V10H7V9h4v7l2 1v1h4v1z"/></svg>
+          Linux
+        </button>
+      </div>
+
+      <!-- Windows guide -->
+      <div class="gs-guide" id="gs-guide-win">
+        <div class="gs-steps">
+          <div class="gs-step">
+            <span class="gs-num">1</span>
+            <div>Install <strong>Node.js</strong> from <a href="https://nodejs.org" target="_blank">nodejs.org</a> (LTS recommended)</div>
+          </div>
+          <div class="gs-step">
+            <span class="gs-num">2</span>
+            <div>Install <strong>FFmpeg</strong> — download from <a href="https://ffmpeg.org/download.html" target="_blank">ffmpeg.org</a> and add to PATH, or run: <code>winget install Gyan.FFmpeg</code></div>
+          </div>
+          <div class="gs-step">
+            <span class="gs-num">3</span>
+            <div>
+              Download and double-click the launcher — it installs dependencies on first run and opens this page automatically:
+              <br/><button class="btn btn-primary" style="margin-top:10px" onclick="dlFile(this,'https://raw.githubusercontent.com/Cr4zySh4rk/video-transcoder/main/launch-windows.bat','launch-windows.bat')">⬇ Download launch-windows.bat</button>
+            </div>
+          </div>
+          <div class="gs-step"><span class="gs-num">4</span><div>Keep the console window open while transcoding. Press Ctrl+C to stop.</div></div>
+        </div>
+      </div>
+
+      <!-- macOS guide -->
+      <div class="gs-guide" id="gs-guide-mac" style="display:none">
+        <div class="gs-steps">
+          <div class="gs-step"><span class="gs-num">1</span><div>Install <strong>Node.js</strong>: <code>brew install node</code></div></div>
+          <div class="gs-step"><span class="gs-num">2</span><div>Install <strong>FFmpeg</strong>: <code>brew install ffmpeg</code></div></div>
+          <div class="gs-step">
+            <span class="gs-num">3</span>
+            <div>
+              Download the launcher, then run it in Terminal:
+              <br/><button class="btn btn-primary" style="margin-top:10px" onclick="dlFile(this,'https://raw.githubusercontent.com/Cr4zySh4rk/video-transcoder/main/launch-mac.sh','launch-mac.sh')">⬇ Download launch-mac.sh</button>
+              <br/><code style="font-size:11px;margin-top:6px;display:inline-block">chmod +x launch-mac.sh &amp;&amp; ./launch-mac.sh</code>
+            </div>
+          </div>
+          <div class="gs-step"><span class="gs-num">4</span><div>Keep the Terminal window open while transcoding.</div></div>
+        </div>
+      </div>
+
+      <!-- Linux guide -->
+      <div class="gs-guide" id="gs-guide-lin" style="display:none">
+        <div class="gs-steps">
+          <div class="gs-step"><span class="gs-num">1</span><div>Install Node.js: <code>sudo apt install nodejs npm</code></div></div>
+          <div class="gs-step"><span class="gs-num">2</span><div>Install FFmpeg: <code>sudo apt install ffmpeg</code></div></div>
+          <div class="gs-step">
+            <span class="gs-num">3</span>
+            <div>
+              Download the launcher, then run it:
+              <br/><button class="btn btn-primary" style="margin-top:10px" onclick="dlFile(this,'https://raw.githubusercontent.com/Cr4zySh4rk/video-transcoder/main/launch-linux.sh','launch-linux.sh')">⬇ Download launch-linux.sh</button>
+              <br/><code style="font-size:11px;margin-top:6px;display:inline-block">chmod +x launch-linux.sh &amp;&amp; ./launch-linux.sh</code>
+            </div>
+          </div>
+          <div class="gs-step"><span class="gs-num">4</span><div>Keep the terminal open while transcoding.</div></div>
+        </div>
+      </div>
+
+      <!-- Server URL + retry — always visible -->
+      <div class="gs-connect-row">
+        <div class="gs-connect-label">Server URL</div>
+        <div class="server-row">
+          <input id="server-url-input" type="text" placeholder="http://localhost:3000" spellcheck="false" />
+          <button class="btn btn-primary" id="connect-btn">Connect</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px">Change the port here if you edited the launcher script</div>
+      </div>
+
+      <!-- 

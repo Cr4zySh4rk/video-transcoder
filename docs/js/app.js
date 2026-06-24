@@ -240,6 +240,8 @@ function handleFile(file) {
   els.fileInfo.classList.add('visible');
   els.transcodeBtn.disabled = true;  // re-enabled after pre-upload
   els.probeChips.innerHTML  = '<span class="chip chip-info">Analyzing…</span>';
+  // Immediately mark the audio select as pending so stale data is never shown
+  els.audioStream.innerHTML = '<option value="0" disabled>Detecting tracks…</option>';
   state.file        = file;
   state.jobId       = null;
   state.preUploaded = false;
@@ -248,6 +250,7 @@ function handleFile(file) {
   if (!state.connected) {
     els.transcodeBtn.disabled = false;
     els.probeChips.innerHTML  = '';
+    els.audioStream.innerHTML = '<option value="0">Track 1 (default)</option>';
     return;
   }
 
@@ -379,9 +382,13 @@ async function startTranscode() {
 }
 
 async function probeFile(jobId) {
+  // Mark the select as loading
+  els.audioStream.innerHTML = '<option value="0" disabled>Detecting tracks…</option>';
   try {
     const r = await fetch(`${state.serverUrl}/api/probe/${jobId}`);
+    if (!r.ok) throw new Error(`Probe returned ${r.status}`);
     const data = await r.json();
+    if (data.error) throw new Error(data.error);
     els.probeChips.innerHTML = '';
 
     const streams = data.streams || [];
@@ -451,6 +458,10 @@ async function probeFile(jobId) {
     }
   } catch (e) {
     console.warn('Probe failed', e);
+    // Fallback: restore a usable select option so transcoding still works
+    els.audioStream.innerHTML = '<option value="0">Track 1 (default)</option>';
+    els.probeChips.innerHTML  = '<span class="chip chip-warn">Could not read file metadata</span>';
+    els.transcodeBtn.disabled  = false;
   }
 }
 

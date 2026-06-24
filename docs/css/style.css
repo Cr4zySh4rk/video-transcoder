@@ -463,8 +463,9 @@ input[type="range"]:hover::-webkit-slider-thumb {
   border: 1px solid var(--border);
   color: var(--muted);
 }
-
 .chip strong { color: var(--text); }
+.chip-info { background: rgba(79,142,247,.12); border-color: rgba(79,142,247,.3); color: var(--accent); }
+.chip-warn { background: rgba(251,191,36,.12); border-color: rgba(251,191,36,.3); color: #fbbf24; }
 
 /* ── Notification toast ───────────────────────────────────────────────── */
 #toast-wrap {

@@ -748,7 +748,7 @@ els.cancelBtn.addEventListener('click', async () => {
 });
 
 // ── Reset ─────────────────────────────────────────────────────────────────
-els.resetBtn.addels.resetBtn.addEventListener('click', () => {
+els.resetBtn.addEventListener('click', () => {
   state.file        = null;
   state.jobId       = null;
   state.sourcePath  = null;
@@ -829,7 +829,7 @@ function renderBatchQueue() {
     const status  = item.status  || 'pending';
     const percent = item.percent || 0;
     const dlUrl   = item.downloadUrl || null;
-    const statusIcon = { pending:'·', running:'▶', done:'✓', error:'✕', cancelled:'—' }[status] || '·';
+    const statusIcon = { pending:'\u00b7', running:'\u25b6', done:'\u2713', error:'\u2715', cancelled:'\u2014' }[status] || '\u00b7';
     const row = document.createElement('div');
     row.className = 'queue-item';
     row.id = `queue-item-${i}`;
@@ -863,7 +863,7 @@ function updateQueueItem(index, update) {
   const dlEl     = $(`qdl-${index}`);
   if (statusEl) {
     statusEl.className = `queue-status ${status}`;
-    statusEl.textContent = { pending:'·', running:'▶', done:'✓', error:'✕', cancelled:'—' }[status]||'·';
+    statusEl.textContent = { pending:'\u00b7', running:'\u25b6', done:'\u2713', error:'\u2715', cancelled:'\u2014' }[status]||'\u00b7';
   }
   if (barEl) barEl.style.width = `${percent}%`;
   if (pctEl) pctEl.textContent = status === 'done' ? '100%' : (percent > 0 ? percent + '%' : '');
@@ -888,7 +888,7 @@ async function startBatch() {
   batchEls.startBtn.disabled  = true;
   batchEls.cancelBtn.disabled = false;
 
-  toast(`Uploading ${batchState.files.length} files…`);
+  toast(`Uploading ${batchState.files.length} files\u2026`);
   const formData = new FormData();
   batchState.files.forEach(f => formData.append('videos', f));
 
@@ -928,7 +928,7 @@ async function startBatch() {
     normalize:        els.normalizeAudio.checked
   };
 
-  toast(`Batch transcode started (${batchState.files.length} files)…`);
+  toast(`Batch transcode started (${batchState.files.length} files)\u2026`);
   try {
     await fetch(`${state.serverUrl}/api/batch-transcode`, {
       method: 'POST',
@@ -971,7 +971,7 @@ function attachBatchSocketEvents(socket) {
     batchState.running = false;
     batchEls.startBtn.disabled  = false;
     batchEls.cancelBtn.disabled = true;
-    toast(`Batch complete — ${total} files transcoded`, 'success', 8000);
+    toast(`Batch complete \u2014 ${total} files transcoded`, 'success', 8000);
   });
 }
 
@@ -984,11 +984,11 @@ function gsExpand(open) {
   if (open) {
     gs.classList.remove('gs-collapsed');
     if (body) body.style.display = '';
-    if (btn)  btn.textContent = '▲ Hide';
+    if (btn)  btn.textContent = '\u25b2 Hide';
   } else {
     gs.classList.add('gs-collapsed');
     if (body) body.style.display = 'none';
-    if (btn)  btn.textContent = '▼ Show';
+    if (btn)  btn.textContent = '\u25bc Show';
   }
 }
 window.gsToggle = () => gsExpand($('get-started').classList.contains('gs-collapsed'));
@@ -996,7 +996,7 @@ window.gsToggle = () => gsExpand($('get-started').classList.contains('gs-collaps
 // ── Init ──────────────────────────────────────────────────────────────────
 (async () => {
   els.transcodeBtn.disabled   = true;
-  els.statusLabel.textContent = 'Connecting…';
+  els.statusLabel.textContent = 'Connecting\u2026';
 
   const fallback = setTimeout(() => {
     if (!state.connected) showNotConnected();

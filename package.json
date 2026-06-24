@@ -1,0 +1,92 @@
+{
+  "name": "videoforge",
+  "version": "1.0.0",
+  "description": "Web-based video transcoder — x264 web-optimized MP4, hardware acceleration, audio dialogue/background mixing",
+  "main": "electron/main.js",
+  "author": "Cr4zySh4rk",
+  "license": "MIT",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "concurrently -k \"node server.js\" \"wait-on tcp:3000 && electron .\"",
+    "dist": "electron-builder",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.cr4zysh4rk.videoforge",
+    "productName": "VideoForge",
+    "copyright": "Copyright © 2024 Cr4zySh4rk",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "server.js",
+      "docs/**/*",
+      "package.json",
+      "node_modules/**/*",
+      "!node_modules/.cache",
+      "!release/**"
+    ],
+    "extraResources": [],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "electron/icons/icon.ico"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["universal"]
+        }
+      ],
+      "icon": "electron/icons/icon.icns",
+      "category": "public.app-category.utilities",
+      "identity": null,
+      "forceCodeSigning": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "tar.gz",
+          "arch": ["x64"]
+        },
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "electron/icons/",
+      "category": "AudioVideo"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "publish": null
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0",
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.7.5",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "wait-on": "^8.0.0"
+  }
+}

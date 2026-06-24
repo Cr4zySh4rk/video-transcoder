@@ -1,0 +1,217 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ── macOS ─────────────────────────────────────────────────────────────────
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build macOS Universal DMG
+        run: npx electron-builder --mac dmg --universal
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          CSC_NAME: "-"
+          ELECTRON_BUILDER_PUBLISH: never
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean build artifacts
+        run: |
+          rm -f release/*.blockmap release/*.yml release/*.yaml
+          ls -lh release/
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: release/*.dmg
+          if-no-files-found: error
+
+  # ── Windows ───────────────────────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows (installer + portable)
+        run: npx electron-builder --win nsis portable --x64
+        env:
+          ELECTRON_BUILDER_PUBLISH: never
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean build artifacts
+        shell: pwsh
+        run: |
+          Remove-Item release\*.blockmap -ErrorAction SilentlyContinue
+          Remove-Item release\*.yml -ErrorAction SilentlyContinue
+          Get-ChildItem release\
+
+      - name: Upload Windows executables
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: release/*.exe
+          if-no-files-found: error
+
+  # ── Linux ─────────────────────────────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y rpm libarchive-tools
+
+      - name: Build Linux (AppImage + tar.gz)
+        run: npx electron-builder --linux AppImage tar.gz --x64
+        env:
+          ELECTRON_BUILDER_PUBLISH: never
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean build artifacts
+        run: |
+          rm -f release/*.blockmap release/*.yml release/*.yaml
+          ls -lh release/
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            release/*.AppImage
+            release/*.tar.gz
+          if-no-files-found: error
+
+  # ── GitHub Pages deploy ───────────────────────────────────────────────────
+  deploy-pages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload docs/ to Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # ── Create Release (only on tags) ─────────────────────────────────────────
+  create-release:
+    needs: [build-mac, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: List artifacts
+        run: find artifacts/ -type f | sort
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.exe
+            artifacts/**/*.AppImage
+            artifacts/**/*.tar.gz
+          body: |
+            ## VideoForge ${{ github.ref_name }}
+
+            Hardware-accelerated video transcoder — converts any format to x264 web-optimized MP4.
+            Includes audio dialogue/background level controls and EBU R128 loudness normalization.
+            **FFmpeg is bundled — no separate install required.**
+
+            ---
+
+            ### 🌐 Web Interface
+            Use directly in your browser (requires the local server running):
+            **https://Cr4zySh4rk.github.io/video-transcoder/**
+
+            ---
+
+            ### 💾 Downloads
+
+            #### macOS
+            | File | Notes |
+            |------|-------|
+            | `*-universal.dmg` | Universal binary — Intel + Apple Silicon |
+
+            > First launch: right-click → Open → Open (Gatekeeper bypass, one time only)
+
+            #### Windows
+            | File | Notes |
+            |------|-------|
+            | `*Setup*.exe` | NSIS installer with Start Menu shortcut |
+            | `*Portable*.exe` | No install needed, run from anywhere |
+
+            #### Linux
+            | File | Notes |
+            |------|-------|
+            | `*.AppImage` | Single-file, run anywhere (chmod +x first) |
+            | `*.tar.gz` | Extract and run the binary |
+
+            ---
+
+            ### Features
+            - Accepts any video format (MKV, MOV, AVI, TS, MTS, WMV, FLV, WebM…)
+            - Outputs x264 web-optimized MP4 with `-movflags +faststart`
+            - Hardware acceleration: NVIDIA NVENC, AMD AMF, Intel QSV, Apple VideoToolbox
+            - Dialogue/speech level boost (300 Hz–4 kHz EQ)
+            - Background music level control (non-speech band attenuation)
+            - EBU R128 loudness normalization
+            - Multi-track audio selection
+            - Real-time progress via WebSocket

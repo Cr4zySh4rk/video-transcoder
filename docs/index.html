@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VideoForge — Web Video Transcoder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <header>
+    <div class="logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="23 7 16 12 23 17 23 7"/>
+        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+      </svg>
+      VideoForge
+    </div>
+    <div class="server-status">
+      <div class="dot" id="status-dot"></div>
+      <span id="status-label">Connecting…</span>
+    </div>
+  </header>
+
+  <!-- ── Main ───────────────────────────────────────────────────────── -->
+  <main>
+
+    <!-- Setup / Connect Banner -->
+    <div id="connect-banner">
+      <h3>🚀 Local Server Required</h3>
+      <p>VideoForge uses your machine's CPU/GPU for transcoding. You need to run the local server once — it stays open in the background. This page connects to it automatically.</p>
+
+      <!-- OS Setup Steps -->
+      <div id="setup-steps">
+        <div style="margin-bottom:14px;display:flex;gap:8px">
+          <button class="btn btn-ghost" id="os-win" onclick="showOS('win')">Windows</button>
+          <button class="btn btn-ghost" id="os-mac" onclick="showOS('mac')">macOS</button>
+          <button class="btn btn-ghost" id="os-lin" onclick="showOS('lin')">Linux</button>
+        </div>
+
+        <div class="setup-guide" id="guide-win" style="display:none">
+          <div class="step-list">
+            <div class="step"><span class="step-num">1</span><div>Install <strong>Node.js</strong> from <a href="https://nodejs.org" target="_blank">nodejs.org</a></div></div>
+            <div class="step"><span class="step-num">2</span><div>Install <strong>FFmpeg</strong> — download from <a href="https://ffmpeg.org/download.html" target="_blank">ffmpeg.org</a> and add to PATH</div></div>
+            <div class="step"><span class="step-num">3</span>
+              <div>
+                Download &amp; run the launcher:
+                <br/><a class="btn btn-primary" style="margin-top:8px;display:inline-flex" href="https://raw.githubusercontent.com/Cr4zySh4rk/video-transcoder/main/launch-windows.bat" download="launch-windows.bat">⬇ Download launch-windows.bat</a>
+              </div>
+            </div>
+            <div class="step"><span class="step-num">4</span><div>The server opens a console window. Keep it running, then use this page normally.</div></div>
+          </div>
+        </div>
+
+        <div class="setup-guide" id="guide-mac" style="display:none">
+          <div class="step-list">
+            <div class="step"><span class="step-num">1</span><div>Install <strong>Node.js</strong>: <code>brew install node</code></div></div>
+            <div class="step"><span class="step-num">2</span><div>Install <strong>FFmpeg</strong>: <code>brew install ffmpeg</code></div></div>
+            <div class="step"><span class="step-num">3</span>
+              <div>
+                Download &amp; run the launcher:
+                <br/><a class="btn btn-primary" style="margin-top:8px;display:inline-flex" href="https://raw.githubusercontent.com/Cr4zySh4rk/video-transcoder/main/launch-mac.sh" download="launch-mac.sh">⬇ Download launch-mac.sh</a>
+                <br/><code style="font-size:11px;opacity:.7">chmod +x launch-mac.sh &amp;&amp; ./launch-mac.sh</code>
+              </div>
+            </div>
+            <div class="step"><span class="step-num">4</span><div>A Terminal window opens. Keep it running, then use this page normally.</div></div>
+          </div>
+        </div>
+
+        <div class="setup-guide" id="guide-lin" style="display:none">
+          <div class="step-list">
+            <div class="step"><span class="step-num">1</span><div>Install Node.js: <code>sudo apt install nodejs npm</code></div></div>
+            <div class="step"><span class="step-num">2</span><div>Install FFmpeg: <code>sudo apt install ffmpeg</code></div></div>
+            <div class="step"><span class="step-num">3</span>
+              <div>
+                Download &amp; run the launcher:
+                <br/><a class="btn btn-primary" style="margin-top:8px;display:inline-flex" href="https://raw.githubusercontent.com/Cr4zySh4rk/video-transcoder/main/launch-linux.sh" download="launch-linux.sh">⬇ Download launch-linux.sh</a>
+                <br/><code style="font-size:11px;opacity:.7">chmod +x launch-linux.sh &amp;&amp; ./launch-linux.sh</code>
+              </div>
+            </div>
+            <div class="step"><span class="step-num">4</span><div>The server starts in your terminal. Keep it running, then use this page normally.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
+        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">Or enter custom server URL:</label>
+        <div class="server-row">
+          <input id="server-url-input" type="text" placeholder="http://localhost:3000" spellcheck="false" />
+          <button class="btn btn-primary" id="connect-btn">Connect</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode tabs -->
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="tab-single" onclick="switchMode('single')">Single File</button>
+      <button class="mode-tab" id="tab-batch" onclick="switchMode('batch')">Batch / Folder</button>
+    </div>
+
+    <!-- ── Single mode panel ───────────────────────────────────────── -->
+    <div id="single-panel">
+
+    <!-- Drop Zone -->
+    <div id="drop-zone">
+      <input type="file" id="file-input" accept="video/*,.mkv,.avi,.wmv,.flv,.webm,.mov,.m4v,.ts,.mts,.m2ts,.3gp,.ogv,.vob" />
+      <span class="drop-icon">🎬</span>
+      <h2>Drop a video file here</h2>
+      <p>Supports any format: MKV, MOV, AVI, MTS, FLV, WMV, WebM, TS, and more</p>
+      <div class="file-info" id="file-info">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span class="file-name" id="file-name"></span>
+        <span class="file-size" id="file-size"></span>
+      </div>
+      <div id="probe-chips"></div>
+    </div>
+
+    <!-- Options Grid -->
+    <div class="options-grid">
+
+      <!-- Video settings -->
+      <div class="card">
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+          Video Settings
+        </div>
+
+        <div class="field">
+          <label>Encoder</label>
+          <select id="encoder-select">
+            <option value="libx264">Software x264 (CPU)</option>
+            <!-- Hardware encoders populated by JS -->
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Speed / Quality Preset</label>
+          <select id="preset-select">
+            <option value="ultrafast">Ultrafast (fastest, larger file)</option>
+            <option value="superfast">Superfast</option>
+            <option value="veryfast">Very Fast</option>
+            <option value="faster">Faster</option>
+            <option value="fast">Fast</option>
+            <option value="medium" selected>Medium (balanced)</option>
+            <option value="slow">Slow (better quality)</option>
+            <option value="slower">Slower</option>
+            <option value="veryslow">Very Slow (best quality)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Quality (CRF) — lower = better quality, larger file</label>
+          <div class="slider-wrap">
+            <input type="range" id="crf-input" min="0" max="51" value="23" step="1"
+              oninput="document.getElementById('crf-val').textContent=this.value" />
+            <span class="range-val" id="crf-val">23</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Output Resolution</label>
+          <select id="resolution-select">
+            <option value="source" selected>Source (no change)</option>
+            <option value="2160p">4K — 3840×2160</option>
+            <option value="1080p">1080p — 1920×1080</option>
+            <option value="720p">720p — 1280×720</option>
+            <option value="480p">480p — 854×480</option>
+            <option value="360p">360p — 640×360</option>
+          </select>
+        </div>
+
+        <div id="hw-badges"></div>
+      </div>
+
+      <!-- Audio settings -->
+      <div class="card">
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          Audio Settings
+        </div>
+
+        <div class="field">
+          <label>Audio Track</label>
+          <select id="audio-stream">
+            <option value="0">Track 1 (default)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Audio Bitrate</label>
+          <select id="audio-bitrate">
+            <option value="128k">128 kbps</option>
+            <option value="192k" selected>192 kbps</option>
+            <option value="256k">256 kbps</option>
+            <option value="320k">320 kbps</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Dialogue / Speech Level</label>
+          <div class="slider-wrap">
+            <input type="range" id="dialogue-slider" min="-12" max="12" value="0" step="0.5" />
+            <span class="range-val" id="dialogue-val">0 dB</span>
+          </div>
+          <div class="level-bar"><div class="level-fill dialogue" id="dialogue-level-bar" style="width:50%"></div></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Boosts the 300 Hz–4 kHz speech frequency band</div>
+        </div>
+
+        <div class="field">
+          <label>Background Music / Score Level</label>
+          <div class="slider-wrap">
+            <input type="range" id="bg-slider" min="-24" max="0" value="0" step="1" />
+            <span class="range-val" id="bg-val">0 dB</span>
+          </div>
+          <div class="level-bar"><div class="level-fill bg-music" id="bg-level-bar" style="width:100%"></div></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Attenuates bass &amp; high-frequency (non-speech) bands</div>
+        </div>
+
+        <label class="toggle-row">
+          <div>
+            <div class="toggle-label">Speech Enhancement</div>
+            <div class="toggle-sub">Multi-band compression + clarity EQ for dialogue</div>
+          </div>
+          <div class="toggle">
+            <input type="checkbox" id="speech-enhance" />
+            <div class="toggle-thumb"></div>
+          </div>
+        </label>
+
+        <label class="toggle-row">
+          <div>
+            <div class="toggle-label">Normalize Audio (EBU R128)</div>
+            <div class="toggle-sub">Loudness normalisation to –16 LUFS</div>
+          </div>
+          <div class="toggle">
+            <input type="checkbox" id="normalize-audio" checked />
+            <div class="toggle-thumb"></div>
+          </div>
+        </label>
+      </div>
+
+    </div><!-- /options-grid -->
+
+    <!-- Actions -->
+    <div class="action-row">
+      <button class="btn btn-primary btn-lg" id="transcode-btn" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Start Transcode
+      </button>
+      <button class="btn btn-danger" id="cancel-btn" disabled>Cancel</button>
+      <button class="btn btn-ghost" id="reset-btn">Reset</button>
+    </div>
+
+    <!-- Progress -->
+    <div id="progress-section">
+      <div class="progress-card">
+        <div class="progress-header">
+          <span class="progress-title">Transcoding…</span>
+          <span id="progress-pct" style="font-family:monospace;font-weight:700;color:var(--accent)">0%</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="progress-bar"></div>
+        </div>
+        <div class="progress-meta">
+          <div class="progress-stat" id="progress-time">--:-- / --:--</div>
+          <div class="progress-stat" id="progress-speed">Speed <span>—</span></div>
+          <div class="progress-stat" id="progress-fps">FPS <span>—</span></div>
+        </div>
+      </div>
+    </div>
+
+    </div><!-- /single-panel -->
+
+    <!-- ── Batch mode panel ────────────────────────────────────────── -->
+    <div id="batch-panel">
+
+      <!-- Batch drop zone -->
+      <div id="batch-drop-zone">
+        <input type="file" id="batch-file-input" multiple
+          accept="video/*,.mkv,.avi,.wmv,.flv,.webm,.mov,.m4v,.ts,.mts,.m2ts,.3gp" />
+        <span class="drop-icon">📂</span>
+        <h2>Drop multiple video files here</h2>
+        <p>Or click to select files — settings below apply to all</p>
+      </div>
+
+      <!-- Queue -->
+      <div class="batch-queue" id="batch-queue">
+        <div class="batch-queue-header">
+          <span id="batch-queue-title">Queue</span>
+          <span id="batch-summary" class="batch-summary"></span>
+        </div>
+        <div class="batch-queue-list" id="batch-queue-list"></div>
+      </div>
+
+      <!-- Batch actions -->
+      <div class="action-row">
+        <button class="btn btn-primary btn-lg" id="batch-start-btn" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Start Batch
+        </button>
+        <button class="btn btn-danger" id="batch-cancel-btn" disabled>Cancel All</button>
+        <button class="btn btn-ghost" id="batch-clear-btn">Clear Queue</button>
+      </div>
+
+    </div><!-- /batch-panel -->
+
+    <!-- Download -->
+    <div id="download-section">
+      <div class="download-card">
+        <div class="download-icon">✅</div>
+        <div class="download-info">
+          <h3>Transcode complete!</h3>
+          <p id="download-meta">Your web-optimized x264 MP4 is ready.</p>
+        </div>
+        <a class="btn btn-success btn-lg" id="download-link" href="#" download>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download
+        </a>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <a href="https://github.com/Cr4zySh4rk/video-transcoder" target="_blank">GitHub</a>
+    &nbsp;·&nbsp; Powered by FFmpeg &amp; Node.js &nbsp;·&nbsp; Runs on your hardware
+  </footer>
+
+</div><!-- /app -->
+
+<div id="toast-wrap"></div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="js/app.js"></script>
+<script>
+// OS auto-detect for setup guide
+function showOS(os) {
+  ['win','mac','lin'].forEach(id => {
+    document.getElementById(`guide-${id}`).style.display = id === os ? 'block' : 'none';
+    document.getElementById(`os-${id}`).style.borderColor = id === os ? 'var(--accent)' : '';
+    document.getElementById(`os-${id}`).style.color       = id === os ? 'var(--accent)' : '';
+  });
+}
+
+// Auto-detect OS
+(function autoDetect() {
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes('win'))    showOS('win');
+  else if (ua.includes('mac')) showOS('mac');
+  else                         showOS('lin');
+})();
+</script>
+
+<style>
+/* Extra styles for setup guide */
+.step-list { display:flex; flex-direction:column; gap:12px; }
+.step {
+  display:flex; align-items:flex-start; gap:12px;
+  font-size:13px; line-height:1.6;
+}
+.step-num {
+  min-width:24px; height:24px;
+  background:rgba(79,142,247,.15);
+  border:1px solid rgba(79,142,247,.3);
+  color:var(--accent);
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; flex-shrink:0;
+  margin-top:2px;
+}
+code {
+  background:var(--surface2);
+  border:1px solid var(--border);
+  padding:2px 8px;
+  border-radius:4px;
+  font-size:12px;
+  font-family:'SF Mono', 'Fira Code', monospace;
+}
+</style>
+</body>
+</html>

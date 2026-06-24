@@ -266,9 +266,13 @@ function handleFile(file) {
   (async () => {
     try {
       const HEADER = 2 * 1024 * 1024; // 2 MB — enough for any container header
+      const ext = file.name.slice(file.name.lastIndexOf('.')); // e.g. ".mkv"
       const r = await fetch(`${state.serverUrl}/api/probe-partial`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/octet-stream' },
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'X-Filename':   ext
+        },
         body:    file.slice(0, HEADER)
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);

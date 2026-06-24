@@ -92,35 +92,39 @@ app.get('/api/probe/:jobId', (req, res) => {
 });
 
 // ── Probe-partial endpoint ────────────────────────────────────────────────
-// Client sends raw bytes (first 2 MB of file) as application/octet-stream.
-// We pipe them directly into ffprobe stdin — no disk write, no temp file,
-// results come back in < 1 second even for large files.
+// Client sends the first 2 MB as application/octet-stream.
+// We write it to a temp file so ffprobe can seek the container header
+// (stdin/pipe:0 prevents seeking and causes missing codec/channel details).
+// Temp file is deleted immediately after ffprobe exits.
 app.post('/api/probe-partial', (req, res) => {
-  const { spawn: spawnProbe } = require('child_process');
-  const ffprobe = spawnProbe(FFPROBE_BIN, [
-    '-v', 'quiet',
-    '-print_format', 'json',
-    '-show_streams',
-    '-show_format',
-    '-i', 'pipe:0'
-  ]);
+  const os   = require('os');
+  const ext  = (req.headers['x-filename'] || '.mkv').replace(/.*(\.\w+)$/, '$1');
+  const tmp  = path.join(os.tmpdir(), `vf-probe-${uuidv4()}${ext}`);
+  const out  = fs.createWriteStream(tmp);
+  const MAX  = 4 * 1024 * 1024; // buffer up to 4 MB
+  let   bytes = 0;
 
-  let stdout = '';
-  let stderr = '';
-  ffprobe.stdout.on('data', d => { stdout += d; });
-  ffprobe.stderr.on('data', d => { stderr += d; });
-
-  ffprobe.on('close', code => {
-    if (!stdout.trim()) return res.status(500).json({ error: 'ffprobe returned no output', stderr });
-    try { res.json(JSON.parse(stdout)); }
-    catch { res.status(500).json({ error: 'Parse failed', stderr }); }
+  req.on('data', chunk => {
+    bytes += chunk.length;
+    if (bytes <= MAX) out.write(chunk);
+    else if (!out.destroyed) out.end(); // stop writing beyond limit
   });
 
-  ffprobe.on('error', err => res.status(500).json({ error: err.message }));
+  req.on('end', () => { if (!out.destroyed) out.end(); });
+  req.on('error', () => { out.destroy(); fs.unlink(tmp, () => {}); });
 
-  // Pipe the raw request body straight into ffprobe — no buffering, no disk
-  req.pipe(ffprobe.stdin);
-  req.on('error', () => ffprobe.stdin.end());
+  out.on('finish', () => {
+    exec(
+      `"${FFPROBE_BIN}" -v quiet -print_format json -show_streams -show_format "${tmp}"`,
+      (err, stdout) => {
+        fs.unlink(tmp, () => {}); // always clean up
+        if (!stdout || !stdout.trim())
+          return res.status(500).json({ error: 'ffprobe returned no output' });
+        try { res.json(JSON.parse(stdout)); }
+        catch { res.status(500).json({ error: 'Parse failed' }); }
+      }
+    );
+  });
 });
 
 // ── Upload endpoint ────────────────────────────────────────────────────────

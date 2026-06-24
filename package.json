@@ -1,7 +1,7 @@
 {
   "name": "videoforge",
   "version": "1.0.0",
-  "description": "Web-based video transcoder — x264 web-optimized MP4, hardware acceleration, audio dialogue/background mixing",
+  "description": "Web-based video transcoder \u2014 x264 web-optimized MP4, hardware acceleration, audio dialogue/background mixing",
   "main": "electron/main.js",
   "author": "Cr4zySh4rk",
   "license": "MIT",
@@ -14,7 +14,7 @@
   "build": {
     "appId": "com.cr4zysh4rk.videoforge",
     "productName": "VideoForge",
-    "copyright": "Copyright © 2024 Cr4zySh4rk",
+    "copyright": "Copyright \u00a9 2024 Cr4zySh4rk",
     "directories": {
       "output": "release"
     },
@@ -33,20 +33,26 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
-      "icon": "electron/icons/icon.ico"
+      "icon": "electron/icons/icon.png"
     },
     "mac": {
       "target": [
         {
           "target": "dmg",
-          "arch": ["universal"]
+          "arch": [
+            "universal"
+          ]
         }
       ],
       "icon": "electron/icons/icon.icns",
@@ -58,11 +64,15 @@
       "target": [
         {
           "target": "tar.gz",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "electron/icons/",

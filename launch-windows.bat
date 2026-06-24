@@ -78,9 +78,12 @@ if not exist "node_modules" (
     echo  [OK] Dependencies installed
 )
 
+:: ── Server port (edit here or set PORT env var before running) ───────────
+set PORT=3000
+
 :: ── Start server ────────────────────────────────────────────────────────
 echo.
-echo  Starting VideoForge server on http://localhost:3000
+echo  Starting VideoForge server on http://localhost:%PORT%
 echo  Open your browser to: https://cr4zysh4rk.github.io/video-transcoder/
 echo.
 echo  Keep this window open while transcoding.
@@ -89,11 +92,4 @@ echo  ==========================================
 echo.
 
 :: Open browser automatically
-timeout /t 2 /nobreak >nul
-start "" "https://cr4zysh4rk.github.io/video-transcoder/"
-
-node server.js
-
-echo.
-echo  Server stopped.
-pause
+timeout /t 2 /no

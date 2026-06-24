@@ -83,9 +83,12 @@ if [ ! -d "node_modules" ]; then
   echo -e "${GREEN}  [OK] Dependencies installed${NC}"
 fi
 
+# ── Server port (edit here or set PORT env var before running) ───────────────
+export PORT=3000
+
 # ── Start server ────────────────────────────────────────────────────────────
 echo ""
-echo -e "  Starting VideoForge server on ${CYAN}http://localhost:3000${NC}"
+echo -e "  Starting VideoForge server on ${CYAN}http://localhost:${PORT}${NC}"
 echo -e "  Open your browser to: ${CYAN}https://cr4zysh4rk.github.io/video-transcoder/${NC}"
 echo ""
 echo "  Keep this window open while transcoding."
@@ -93,8 +96,4 @@ echo "  Press Ctrl+C to stop."
 echo "  =========================================="
 echo ""
 
-# Open GitHub Pages frontend automatically
-sleep 1
-open "https://cr4zysh4rk.github.io/video-transcoder/" 2>/dev/null || true
-
-node server.js
+# Open

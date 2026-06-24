@@ -326,32 +326,23 @@
 
   </main>
 
-  <!-- ── About section ──────────────────────────────────────────────── -->
-  <section id="about">
-    <div class="about-inner">
-      <div class="about-col">
-        <div class="about-logo">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="23 7 16 12 23 17 23 7"/>
-            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-          </svg>
-          VideoForge
-        </div>
-        <p class="about-desc">A free, open-source video transcoder that runs entirely on your own hardware. No uploads to the cloud. No limits.</p>
-        <div class="about-url-badge">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          <a href="https://cr4zysh4rk.github.io/video-transcoder/" target="_blank">cr4zysh4rk.github.io/video-transcoder</a>
-        </div>
+  <!-- ── Get Started / Downloads (always visible) ──────────────────── -->
+  <section id="get-started">
+    <div class="gs-inner">
+      <div class="gs-header">
+        <h2 class="gs-title">Get Started</h2>
+        <p class="gs-sub">VideoForge runs a tiny local server on your machine — this page connects to it and provides the interface. Download the launcher for your OS, run it once, and you're set.</p>
       </div>
-      <div class="about-col">
-        <div class="about-section-title">Features</div>
-        <ul class="about-list">
-          <li>Any input format → x264 web-optimized MP4</li>
-          <li>NVIDIA, AMD, Intel &amp; Apple GPU acceleration</li>
-          <li>Dialogue/background audio level control</li>
-          <li>Batch transcode entire folders</li>
-          <li>Real-time progress via WebSocket</li>
-        </ul>
-      </div>
-      <div class="about-col">
-        <div class="about-sec
+
+      <!-- OS picker -->
+      <div class="gs-os-tabs">
+        <button class="gs-tab active" id="gs-win" onclick="gsOS('win')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+          Windows
+        </button>
+        <button class="gs-tab" id="gs-mac" onclick="gsOS('mac')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+          macOS
+        </button>
+        <button class="gs-tab" id="gs-lin" onclick="gsOS('lin')">
+          <svg width="14" height="14" viewBox="0 0 24 

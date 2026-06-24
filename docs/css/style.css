@@ -658,16 +658,19 @@ input[type="range"]:hover::-webkit-slider-thumb {
   color: var(--muted);
 }
 
-/* ── About section ────────────────────────────────────────────────────── */
-#about {
+/* ── Get Started section ──────────────────────────────────────────────── */
+#get-started {
   border-top: 1px solid var(--border);
   background: var(--surface);
-  margin-top: 40px;
   padding: 40px 24px;
 }
 
-.about-inner {
+.gs-inner {
   max-width: 960px;
   margin: 0 auto;
-  display: grid;
-  grid-temp
+}
+
+.gs-header { margin-bottom: 24px; }
+
+.gs-title {
+  fon

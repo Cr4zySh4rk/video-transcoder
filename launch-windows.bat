@@ -36,9 +36,7 @@ if exist "%APPDATA%\nvm\current\node.exe" (
 )
 
 echo  [ERROR] Node.js is not installed or not in PATH.
-echo.
-echo  Please install from https://nodejs.org ^(LTS recommended^)
-echo  Then re-run this script.
+echo  Install from https://nodejs.org then re-run this script.
 echo.
 pause
 start https://nodejs.org
@@ -71,12 +69,8 @@ if exist "%USERPROFILE%\ffmpeg\bin\ffmpeg.exe" (
 )
 
 echo.
-echo  [ERROR] FFmpeg is not installed or not in PATH.
-echo.
-echo  Quick install ^(run in a new terminal window^):
-echo    winget install Gyan.FFmpeg
-echo.
-echo  Then close and re-run this script.
+echo  [ERROR] FFmpeg not found. Install via: winget install Gyan.FFmpeg
+echo  Then re-run this script.
 echo.
 pause
 start https://ffmpeg.org/download.html
@@ -90,60 +84,61 @@ for /f "tokens=*" %%v in ('"%FFMPEG_EXE%" -version 2^>^&1 ^| findstr /i "ffmpeg 
 :ffmpeg_ok
 echo  [OK] %FF_VER%
 
-:: ── Locate / set up server directory ───────────────────────────────────
+:: ── Set working directory ───────────────────────────────────────────────
 set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
 
-:: Auto-download server files if missing (user only downloaded the .bat)
-if not exist "server.js" (
-    echo.
-    echo  [SETUP] server.js not found — downloading server files from GitHub...
-    echo.
+:: ── Auto-download server files if missing ──────────────────────────────
+if exist "server.js" goto server_ready
 
-    where curl >nul 2>&1
-    if errorlevel 1 (
-        echo  [ERROR] curl not found. Please download the full release zip from:
-        echo  https://github.com/Cr4zySh4rk/video-transcoder/releases
-        echo  Extract it, then run launch-windows.bat from inside that folder.
-        pause
-        exit /b 1
-    )
+echo.
+echo  [SETUP] server.js not found — downloading server files from GitHub...
 
-    set BASE=https://raw.githubusercontent.com/Cr4zySh4rk/video-transcoder/main
-    echo  Downloading server.js...
-    curl -fsSL "%BASE%/server.js" -o server.js
-    if errorlevel 1 goto dl_fail
+where curl >nul 2>&1
+if errorlevel 1 goto no_curl
 
-    echo  Downloading package.json...
-    curl -fsSL "%BASE%/package.json" -o package.json
-    if errorlevel 1 goto dl_fail
+set "BASE=https://raw.githubusercontent.com/Cr4zySh4rk/video-transcoder/main"
 
-    echo  [OK] Server files downloaded.
-    goto dl_done
+echo  Downloading server.js...
+curl -fsSL "%BASE%/server.js" -o server.js
+if errorlevel 1 goto dl_fail
 
-    :dl_fail
-    echo.
-    echo  [ERROR] Download failed. Check your internet connection, or get the
-    echo  full zip from https://github.com/Cr4zySh4rk/video-transcoder/releases
-    pause
-    exit /b 1
+echo  Downloading package.json...
+curl -fsSL "%BASE%/package.json" -o package.json
+if errorlevel 1 goto dl_fail
 
-    :dl_done
-)
+echo  [OK] Server files downloaded.
+goto server_ready
+
+:no_curl
+echo  [ERROR] curl not found. Please download the full release zip from:
+echo  https://github.com/Cr4zySh4rk/video-transcoder/releases
+echo  Extract it, then run launch-windows.bat from that folder.
+pause
+exit /b 1
+
+:dl_fail
+echo  [ERROR] Download failed. Check your internet connection.
+echo  Or get the zip from: https://github.com/Cr4zySh4rk/video-transcoder/releases
+pause
+exit /b 1
+
+:server_ready
 
 :: ── Install npm dependencies ────────────────────────────────────────────
-if not exist "node_modules" (
-    echo.
-    echo  [SETUP] Installing dependencies ^(first run only^)...
-    call npm install
-    if errorlevel 1 (
-        echo.
-        echo  [ERROR] npm install failed. Check your internet connection.
-        pause
-        exit /b 1
-    )
-    echo  [OK] Dependencies installed
+if exist "node_modules" goto deps_ready
+
+echo.
+echo  [SETUP] Installing dependencies (first run only)...
+call npm install
+if errorlevel 1 (
+    echo  [ERROR] npm install failed. Check your internet connection.
+    pause
+    exit /b 1
 )
+echo  [OK] Dependencies installed
+
+:deps_ready
 
 :: ── Port ────────────────────────────────────────────────────────────────
 set PORT=3000

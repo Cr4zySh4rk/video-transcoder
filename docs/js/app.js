@@ -2,8 +2,16 @@
 'use strict';
 
 // ── State ────────────────────────────────────────────────────────────────
+// When running inside the Electron desktop app, the preload script injects
+// window.electronAPI.serverPort with the actual bound port (may differ from
+// 3000 if that port was taken). Use that over the localStorage value so the
+// app connects correctly on first launch without any user action.
+const _electronUrl = window.electronAPI
+  ? `http://localhost:${window.electronAPI.serverPort}`
+  : null;
+
 const state = {
-  serverUrl:   localStorage.getItem('serverUrl') || 'http://localhost:3000',
+  serverUrl:   _electronUrl || localStorage.getItem('serverUrl') || 'http://localhost:3000',
   jobId:       null,
   socket:      null,
   connected:   false,
@@ -788,20 +796,4 @@ window.gsToggle = () => gsExpand(document.getElementById('get-started').classLis
 
 // ── Init ──────────────────────────────────────────────────────────────────
 (async () => {
-  els.transcodeBtn.disabled = true;
-  els.statusLabel.textContent = 'Connecting…';
-
-  // Independent 5s fallback: if still not connected, scroll to Get Started
-  const fallback = setTimeout(() => {
-    if (!state.connected) showNotConnected();
-  }, 5000);
-
-  const ok = await checkServer(state.serverUrl);
-  clearTimeout(fallback);
-
-  if (ok) {
-    showConnected(state.serverUrl);
-  } else {
-    showNotConnected();
-  }
-})();
+  els.tr

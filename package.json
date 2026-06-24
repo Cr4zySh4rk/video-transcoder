@@ -1,6 +1,6 @@
 {
   "name": "videoforge",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "Web-based video transcoder \u2014 x264 web-optimized MP4, hardware acceleration, audio dialogue/background mixing",
   "main": "electron/main.js",
   "author": "Cr4zySh4rk",
@@ -85,6 +85,7 @@
     },
     "publish": null,
     "asarUnpack": [
+      "electron/preload.js",
       "docs/**/*",
       "node_modules/ffmpeg-static/**",
       "node_modules/ffprobe-static/**"
@@ -102,6 +103,3 @@
     "concurrently": "^8.2.2",
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3",
-    "wait-on": "^8.0.0"
-  }
-}

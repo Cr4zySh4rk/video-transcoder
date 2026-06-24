@@ -19,9 +19,17 @@ const PORT = process.env.PORT || 3000;
 const UPLOAD_DIR = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
 const OUTPUT_DIR = process.env.OUTPUTS_DIR || path.join(__dirname, 'outputs');
 
-// ── Use bundled FFmpeg if Electron set the path ────────────────────────────
-const FFMPEG_BIN  = process.env.FFMPEG_PATH  || 'ffmpeg';
-const FFPROBE_BIN = process.env.FFPROBE_PATH || 'ffprobe';
+// ── Use bundled FFmpeg/FFprobe ─────────────────────────────────────────────
+// Electron's main.js sets FFMPEG_PATH/FFPROBE_PATH to the unpacked binaries.
+// For standalone `node server.js`, fall back to the bundled static packages
+// so the server works out-of-the-box without needing FFmpeg in PATH.
+function resolveBin(envVar, staticPkg, fallback) {
+  if (process.env[envVar]) return process.env[envVar];
+  try { return require(staticPkg).path || require(staticPkg); } catch {}
+  return fallback;
+}
+const FFMPEG_BIN  = resolveBin('FFMPEG_PATH',  'ffmpeg-static',         'ffmpeg');
+const FFPROBE_BIN = resolveBin('FFPROBE_PATH', 'ffprobe-static', 'ffprobe');
 
 [UPLOAD_DIR, OUTPUT_DIR].forEach(d => fs.mkdirSync(d, { recursive: true }));
 
@@ -476,21 +484,4 @@ let _resolvePort, _rejectPort;
 const portReady = new Promise((res, rej) => { _resolvePort = res; _rejectPort = rej; });
 
 (function tryListen(port) {
-  if (port > PORT + 10) return _rejectPort(new Error('No free port found in range ' + PORT + '–' + (PORT + 10)));
-  server.listen(port)
-    .on('listening', () => {
-      console.log(`\n🎬  VideoForge server running at http://localhost:${port}`);
-      _resolvePort(port);
-    })
-    .on('error', err => {
-      if (err.code === 'EADDRINUSE') {
-        console.warn(`Port ${port} in use, trying ${port + 1}…`);
-        server.close(() => tryListen(port + 1));
-      } else {
-        _rejectPort(err);
-      }
-    });
-}(PORT));
-
-// Export for Electron main process
-module.exports = { server, io, portReady };
+  if (port > PORT + 10) return _rejectPort(new Error('No free port found in range ' + PORT + '–' + (PORT + 10)

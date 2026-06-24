@@ -90,6 +90,8 @@ function startServer() {
       .then(port => {
         clearTimeout(timer);
         actualPort = port;
+        // Expose port to the preload script (set before window is created)
+        process.env.ELECTRON_SERVER_PORT = String(port);
         console.log('[main] server ready on port', port);
         resolve();
       })
@@ -99,6 +101,12 @@ function startServer() {
 
 // ── Create the main window ────────────────────────────────────────────────
 function createWindow() {
+  // Preload script: runs before page JS, exposes server port via window.electronAPI
+  // Unpacked so the OS can load it as a real file (preloads inside .asar can be tricky).
+  const preloadPath = isPackaged
+    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'preload.js')
+    : path.join(__dirname, 'preload.js');
+
   mainWindow = new BrowserWindow({
     width:           1200,
     height:          820,
@@ -108,6 +116,7 @@ function createWindow() {
     backgroundColor: '#0d0f14',
     show:            false,
     webPreferences: {
+      preload:               preloadPath,
       contextIsolation:      true,
       nodeIntegration:       false,
       webSecurity:           true,
@@ -141,49 +150,22 @@ function createWindow() {
   ]);
   Menu.setApplicationMenu(menu);
 
-  mainWindow.loadURL(`http://localhost:${actualPort}`);
+  // In packaged builds, load the HTML directly from the known-good unpacked path.
+  // This avoids relying on express.static to find docs/ (which silently 404s if
+  // the DOCS_DIR env-var path doesn't match what electron-builder actually unpacked).
+  // In dev, loadURL so the server hot-path works normally.
+  if (isPackaged) {
+    const htmlPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'docs', 'index.html');
+    console.log('[main] loading file:', htmlPath);
+    mainWindow.loadFile(htmlPath).catch(err => {
+      console.error('[main] loadFile failed:', err.message);
+      // Fallback: try HTTP in case docs aren't unpacked
+      mainWindow.loadURL(`http://localhost:${actualPort}`);
+    });
+  } else {
+    mainWindow.loadURL(`http://localhost:${actualPort}`);
+  }
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
 
-  // Open external links in default browser
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
-
-  mainWindow.on('closed', () => { mainWindow = null; });
-}
-
-// ── App lifecycle ──────────────────────────────────────────────────────────
-app.whenReady().then(async () => {
-  try {
-    await startServer();
-    createWindow();
-  } catch (err) {
-    dialog.showErrorBox(
-      'VideoForge — Server Error',
-      `Failed to start the local transcoding server:\n\n${err.message}\n\nPlease report this issue on GitHub.`
-    );
-    app.quit();
-  }
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-});
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
-
-app.on('before-quit', () => {
-  if (serverModule && serverModule.server) {
-    serverModule.server.close();
-    serverModule = null;
-  }
-  if (serverProcess) { serverProcess.kill('SIGTERM'); serverProcess = null; }
-});
-
-app.on('will-quit', () => {
-  if (serverProcess) { serverProcess.kill('SIGKILL'); serverProcess = null; }
-});
+  // Open external lin

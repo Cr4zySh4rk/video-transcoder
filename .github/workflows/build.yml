@@ -168,7 +168,9 @@ jobs:
           if-no-files-found: error
 
   # ── GitHub Pages deploy ───────────────────────────────────────────────────
+  # Only runs on pushes to main (not on tags — Pages environment is branch-scoped).
   deploy-pages:
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -219,9 +221,4 @@ jobs:
             artifacts/**/*.dmg
             artifacts/**/*.exe
             artifacts/**/*.AppImage
-            artifacts/**/*.tar.gz
-            artifacts/**/*.apk
-          body: |
-            ## VideoForge ${{ github.ref_name }}
-
-            Hardware-accelerated video tran
+      

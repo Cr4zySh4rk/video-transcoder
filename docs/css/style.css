@@ -930,3 +930,64 @@ footer a {
 }
 
 footer a:hover { color: var(--text); }
+
+/* ── Main panel lock (not connected) ─────────────────────────────────── */
+main.locked {
+  position: relative;
+  pointer-events: none;
+  user-select: none;
+}
+
+main.locked::after {
+  content: 'Start the local server to use VideoForge';
+  position: absolute;
+  inset: 0;
+  background: rgba(10,10,15,.72);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+  border-radius: 12px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* ── Get Started collapse ─────────────────────────────────────────────── */
+.gs-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6px;
+}
+
+.gs-toggle-btn {
+  flex-shrink: 0;
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+}
+
+.gs-toggle-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+#get-started.gs-collapsed {
+  padding-bottom: 20px;
+}
+
+#get-started.gs-collapsed .gs-sub {
+  display: none;
+}

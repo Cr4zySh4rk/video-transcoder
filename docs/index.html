@@ -206,10 +206,14 @@
   <section id="get-started">
     <div class="gs-inner">
       <div class="gs-header">
-        <h2 class="gs-title">Get Started</h2>
+        <div class="gs-header-row">
+          <h2 class="gs-title">Get Started</h2>
+          <button class="gs-toggle-btn" id="gs-toggle-btn" onclick="gsToggle()">&#x25B2; Hide</button>
+        </div>
         <p class="gs-sub">VideoForge runs a tiny local server on your machine. Download the launcher for your OS, run it once, and come back here to transcode.</p>
       </div>
 
+      <div id="gs-body">
       <div class="gs-os-tabs">
         <button class="gs-tab active" id="gs-win" onclick="gsOS('win')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
@@ -297,6 +301,7 @@
       <div class="gs-alt">
         Or download the <a href="https://github.com/Cr4zySh4rk/video-transcoder/releases" target="_blank">desktop app</a> — no Node.js or FFmpeg required.
       </div>
+      </div><!-- /gs-body -->
     </div>
   </section>
 

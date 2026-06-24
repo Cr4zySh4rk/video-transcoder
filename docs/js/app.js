@@ -98,10 +98,13 @@ function showNotConnected() {
   state.connected = false;
   els.statusDot.classList.remove('online');
   els.statusLabel.textContent = 'Not connected';
-  // Show retry callout and scroll to Get Started
+  // Lock main panel
+  document.querySelector('main').classList.add('locked');
+  // Expand Get Started and show retry callout
+  gsExpand(true);
   const callout = document.getElementById('gs-retry-callout');
-  const gs      = document.getElementById('get-started');
   if (callout) callout.style.display = 'block';
+  const gs = document.getElementById('get-started');
   if (gs) gs.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -111,6 +114,10 @@ function showConnected(url) {
   localStorage.setItem('serverUrl', url);
   els.statusDot.classList.add('online');
   els.statusLabel.textContent = `Connected — ${url}`;
+  // Unlock main panel
+  document.querySelector('main').classList.remove('locked');
+  // Collapse Get Started
+  gsExpand(false);
   // Hide retry callout
   const callout = document.getElementById('gs-retry-callout');
   if (callout) callout.style.display = 'none';
@@ -669,4 +676,40 @@ function attachBatchSocketEvents(socket) {
   });
 }
 
-// ─�
+// ── Get Started collapse/expand ───────────────────────────────────────────
+function gsExpand(open) {
+  const gs   = document.getElementById('get-started');
+  const body = document.getElementById('gs-body');
+  const btn  = document.getElementById('gs-toggle-btn');
+  if (!gs) return;
+  if (open) {
+    gs.classList.remove('gs-collapsed');
+    if (body) body.style.display = '';
+    if (btn) btn.textContent = '▲ Hide';
+  } else {
+    gs.classList.add('gs-collapsed');
+    if (body) body.style.display = 'none';
+    if (btn) btn.textContent = '▼ Show';
+  }
+}
+window.gsToggle = () => gsExpand(document.getElementById('get-started').classList.contains('gs-collapsed'));
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(async () => {
+  els.transcodeBtn.disabled = true;
+  els.statusLabel.textContent = 'Connecting…';
+
+  // Independent 5s fallback: if still not connected, scroll to Get Started
+  const fallback = setTimeout(() => {
+    if (!state.connected) showNotConnected();
+  }, 5000);
+
+  const ok = await checkServer(state.serverUrl);
+  clearTimeout(fallback);
+
+  if (ok) {
+    showConnected(state.serverUrl);
+  } else {
+    showNotConnected();
+  }
+})();

@@ -7,21 +7,30 @@ const http = require('http');
 
 // ── Resolve paths inside asar or dev ──────────────────────────────────────
 const isPackaged = app.isPackaged;
+
+// server.js, docs/, ffmpeg-static and ffprobe-static are all in asarUnpack,
+// so they live at app.asar.unpacked/ inside the package — real files the OS can execute.
+// In dev they're just at the repo root.
 const rootDir = isPackaged
-  ? path.join(process.resourcesPath, 'app')
+  ? path.join(process.resourcesPath, 'app.asar.unpacked')
   : path.join(__dirname, '..');
 
+// ffmpeg-static returns a path inside the virtual asar (e.g. /…/app.asar/node_modules/…).
+// We need the real on-disk path in app.asar.unpacked so the OS can actually execute it.
+function toUnpacked(p) {
+  return p.replace(/app\.asar([/\\])/, 'app.asar.unpacked$1');
+}
+
 // ── Override ffmpeg/ffprobe paths to use bundled binaries ─────────────────
-// ffmpeg-static and ffprobe-static ship binaries for each platform.
-// When packaged, they end up inside the asar; we point env vars to them.
 try {
-  const ffmpegPath  = require('ffmpeg-static');
-  const ffprobePath = require('ffprobe-static').path;
-  process.env.FFMPEG_PATH  = ffmpegPath;
-  process.env.FFPROBE_PATH = ffprobePath;
-  // Also add the directory to PATH so server.js can call ffmpeg directly
-  const ffDir = path.dirname(ffmpegPath);
+  const ffmpegRaw   = require('ffmpeg-static');
+  const ffprobeRaw  = require('ffprobe-static').path;
+  process.env.FFMPEG_PATH  = isPackaged ? toUnpacked(ffmpegRaw)  : ffmpegRaw;
+  process.env.FFPROBE_PATH = isPackaged ? toUnpacked(ffprobeRaw) : ffprobeRaw;
+  const ffDir = path.dirname(process.env.FFMPEG_PATH);
   process.env.PATH = ffDir + path.delimiter + (process.env.PATH || '');
+  console.log('[main] ffmpeg:', process.env.FFMPEG_PATH);
+  console.log('[main] ffprobe:', process.env.FFPROBE_PATH);
 } catch (e) {
   console.warn('ffmpeg-static not found, falling back to system FFmpeg:', e.message);
 }

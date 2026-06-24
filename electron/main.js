@@ -35,7 +35,8 @@ try {
   console.warn('ffmpeg-static not found, falling back to system FFmpeg:', e.message);
 }
 
-const PORT = 3000;
+const PREFERRED_PORT = 3000;
+let   actualPort       = PREFERRED_PORT;
 let serverProcess = null;  // kept for legacy cleanup
 let serverModule   = null;  // inline-required server
 let mainWindow    = null;
@@ -63,7 +64,7 @@ app.on('second-instance', () => {
 function startServer() {
   return new Promise((resolve, reject) => {
     // Set env vars that server.js reads at module-load time
-    process.env.PORT        = String(PORT);
+    process.env.PORT        = String(PREFERRED_PORT);
     process.env.ELECTRON_RUN = '1';
     process.env.UPLOADS_DIR = path.join(app.getPath('userData'), 'uploads');
     process.env.OUTPUTS_DIR = path.join(app.getPath('userData'), 'outputs');
@@ -73,7 +74,6 @@ function startServer() {
       : path.join(__dirname, '..', 'docs');
 
     try {
-      // server.js lives inside the asar — Electron's require() handles this
       const serverPath = isPackaged
         ? path.join(process.resourcesPath, 'app.asar', 'server.js')
         : path.join(__dirname, '..', 'server.js');
@@ -83,19 +83,17 @@ function startServer() {
       return reject(new Error('Failed to load server: ' + e.message));
     }
 
-    // Poll until Express is accepting connections
-    let attempts = 0;
-    const poll = setInterval(() => {
-      attempts++;
-      http.get(`http://localhost:${PORT}/api/health`, res => {
-        if (res.statusCode === 200) { clearInterval(poll); resolve(); }
-      }).on('error', () => {
-        if (attempts > 60) {
-          clearInterval(poll);
-          reject(new Error('Server did not become ready (60 s timeout)'));
-        }
-      });
-    }, 500);
+    // server.js exports portReady — resolves with the port it actually bound to
+    // (auto-increments from PREFERRED_PORT if 3000 is taken)
+    const timer = setTimeout(() => reject(new Error('Server startup timeout (30 s)')), 30000);
+    serverModule.portReady
+      .then(port => {
+        clearTimeout(timer);
+        actualPort = port;
+        console.log('[main] server ready on port', port);
+        resolve();
+      })
+      .catch(err => { clearTimeout(timer); reject(err); });
   });
 }
 
@@ -143,7 +141,7 @@ function createWindow() {
   ]);
   Menu.setApplicationMenu(menu);
 
-  mainWindow.loadURL(`http://localhost:${PORT}`);
+  mainWindow.loadURL(`http://localhost:${actualPort}`);
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
 

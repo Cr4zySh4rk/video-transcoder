@@ -469,9 +469,28 @@ process.on('exit', () => {
   jobs.forEach(job => { if (job.process) job.process.kill('SIGKILL'); });
 });
 
-server.listen(PORT, () => {
-  console.log(`\n🎬  VideoForge server running at http://localhost:${PORT}`);
-});
+// ── Auto-find a free port ────────────────────────────────────────────────
+// If the preferred port is taken (e.g. previous crash, another process),
+// increment and retry up to 10 times instead of crashing.
+let _resolvePort, _rejectPort;
+const portReady = new Promise((res, rej) => { _resolvePort = res; _rejectPort = rej; });
+
+(function tryListen(port) {
+  if (port > PORT + 10) return _rejectPort(new Error('No free port found in range ' + PORT + '–' + (PORT + 10)));
+  server.listen(port)
+    .on('listening', () => {
+      console.log(`\n🎬  VideoForge server running at http://localhost:${port}`);
+      _resolvePort(port);
+    })
+    .on('error', err => {
+      if (err.code === 'EADDRINUSE') {
+        console.warn(`Port ${port} in use, trying ${port + 1}…`);
+        server.close(() => tryListen(port + 1));
+      } else {
+        _rejectPort(err);
+      }
+    });
+}(PORT));
 
 // Export for Electron main process
-module.exports = { server, io };
+module.exports = { server, io, portReady };

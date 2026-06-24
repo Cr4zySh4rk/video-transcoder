@@ -16,6 +16,7 @@ const state = {
   uploading:    false,
   transcoding:  false,
   preUploaded:  false,
+  preUploading:  false,
   file:         null,
   outputDir:    null,    // explicit destination folder (Electron only)
   sourcePath:   null,    // original file path for default-same-dir behaviour
@@ -384,9 +385,13 @@ function handleFile(file) {
   els.probeChips.innerHTML  = '<span class="chip chip-info">Analyzing…</span>';
   els.audioStream.innerHTML = '<option value="0" disabled>Detecting tracks…</option>';
   els.subtitleSelect.innerHTML = '<option value="-1">None</option>';
-  state.file        = file;
-  state.jobId       = null;
-  state.preUploaded = false;
+  // Cancel any pending background upload from a previous file selection
+  if (state._preUploadCtrl) { state._preUploadCtrl.abort(); state._preUploadCtrl = null; }
+
+  state.file         = file;
+  state.jobId        = null;
+  state.preUploaded  = false;
+  state.preUploading = false;
 
   // Electron: capture native file path for same-folder output default
   state.sourcePath = (file.path && typeof file.path === 'string' && file.path !== '') ? file.path : null;
@@ -399,25 +404,52 @@ function handleFile(file) {
   }
 
   (async () => {
+    // Step A — partial probe on the first 4 MB for instant feedback
     try {
-      const HEADER = 2 * 1024 * 1024;
-      const ext    = encodeURIComponent(file.name.slice(file.name.lastIndexOf('.')));
+      const ext = encodeURIComponent(file.name.slice(file.name.lastIndexOf('.')));
       const r = await fetch(`${state.serverUrl}/api/probe-partial?ext=${ext}`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/octet-stream' },
-        body:    file.slice(0, HEADER)
+        body:    file.slice(0, 4 * 1024 * 1024)
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
       if (data.error) throw new Error(data.error);
-      // Pass real file size so we don't show the 2 MB slice size
       renderProbeData(data, file.size);
     } catch (e) {
-      console.warn('Probe failed:', e.message);
-      els.probeChips.innerHTML  = '';
-      els.audioStream.innerHTML = '<option value="0">Track 1 (default)</option>';
+      console.warn('Partial probe failed:', e.message);
+      els.probeChips.innerHTML  = '<span class="chip chip-info">Uploading for analysis…</span>';
+      els.audioStream.innerHTML = '<option value="0" disabled>Detecting tracks…</option>';
     }
     els.transcodeBtn.disabled = false;
+
+    // Step B — background full upload + full probe so tracks/metadata are
+    //           ready before the user clicks Start Transcode.
+    const ctrl = new AbortController();
+    state._preUploadCtrl = ctrl;
+    state.preUploading   = true;
+    try {
+      const formData = new FormData();
+      formData.append('video', file);
+      const upRes = await fetch(`${state.serverUrl}/api/upload`, {
+        method: 'POST',
+        body:   formData,
+        signal: ctrl.signal
+      });
+      if (!upRes.ok) throw new Error('Pre-upload failed');
+      const { jobId } = await upRes.json();
+      if (state.file !== file) return;  // user selected a different file while uploading
+      state.jobId        = jobId;
+      state.preUploaded  = true;
+      state.preUploading = false;
+      state._preUploadCtrl = null;
+      // Full probe — overwrites partial-probe chips/tracks with accurate data
+      await probeFile(jobId);
+    } catch (e) {
+      if (e.name !== 'AbortError') console.warn('Background upload failed:', e.message);
+      state.preUploading = false;
+      state._preUploadCtrl = null;
+    }
   })();
 }
 
@@ -676,29 +708,35 @@ async function startTranscode() {
   }
 
   try {
-    // 1 — Upload full file
-    toast('Uploading file…');
-    const formData = new FormData();
-    formData.append('video', state.file);
-
-    const upRes = await fetch(`${state.serverUrl}/api/upload`, { method: 'POST', body: formData });
-    if (!upRes.ok) throw new Error('Upload failed');
-    const { jobId } = await upRes.json();
-    state.jobId = jobId;
-    state.socket.emit('join', jobId);
-
-    // 1b — Full probe: update metadata now that the full file is on the server.
-    //      Save and restore any track selections the user already made.
-    {
-      const savedAudio    = els.audioStream.value;
-      const savedSubtitle = els.subtitleSelect.value;
-      toast('Analyzing file…');
-      await probeFile(jobId);
-      if ([...els.audioStream.options].some(o => o.value === savedAudio))
-        els.audioStream.value = savedAudio;
-      if ([...els.subtitleSelect.options].some(o => o.value === savedSubtitle))
-        els.subtitleSelect.value = savedSubtitle;
+    // 1 — Upload (skip if the background pre-upload already finished)
+    let jobId;
+    if (state.preUploaded && state.jobId) {
+      // File was pre-uploaded on select — nothing to do
+      jobId = state.jobId;
+    } else {
+      // Either pre-upload is still in progress or failed; wait briefly then upload
+      if (state.preUploading) {
+        toast('Finishing upload…');
+        await new Promise(resolve => {
+          const t = setInterval(() => { if (!state.preUploading) { clearInterval(t); resolve(); } }, 200);
+        });
+      }
+      if (state.preUploaded && state.jobId) {
+        jobId = state.jobId;
+      } else {
+        // Pre-upload failed or was cancelled — fall back to a fresh upload now
+        if (state._preUploadCtrl) { state._preUploadCtrl.abort(); state._preUploadCtrl = null; }
+        toast('Uploading file…');
+        const formData = new FormData();
+        formData.append('video', state.file);
+        const upRes = await fetch(`${state.serverUrl}/api/upload`, { method: 'POST', body: formData });
+        if (!upRes.ok) throw new Error('Upload failed');
+        jobId = (await upRes.json()).jobId;
+        state.jobId      = jobId;
+        state.preUploaded = true;
+      }
     }
+    state.socket.emit('join', jobId);
 
     // 2 — Parse trim times
     const startTime = parseTrimTime(els.trimStart.value);

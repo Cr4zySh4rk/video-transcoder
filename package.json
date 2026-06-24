@@ -83,7 +83,12 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true
     },
-    "publish": null
+    "publish": null,
+    "asarUnpack": [
+      "docs/**/*",
+      "node_modules/ffmpeg-static/**",
+      "node_modules/ffprobe-static/**"
+    ]
   },
   "dependencies": {
     "express": "^4.18.2",

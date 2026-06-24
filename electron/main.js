@@ -36,7 +36,8 @@ try {
 }
 
 const PORT = 3000;
-let serverProcess = null;
+let serverProcess = null;  // kept for legacy cleanup
+let serverModule   = null;  // inline-required server
 let mainWindow    = null;
 let tray          = null;
 
@@ -55,44 +56,44 @@ app.on('second-instance', () => {
 });
 
 // ── Start embedded Node.js server ─────────────────────────────────────────
+// We require() server.js directly in the main process rather than spawning it.
+// Spawning process.execPath (the Electron binary) doesn't work in packaged
+// apps — it just opens a second app instance instead of running Node.js.
+// require() works from the asar via Electron's patched module system.
 function startServer() {
   return new Promise((resolve, reject) => {
-    const serverPath = path.join(rootDir, 'server.js');
+    // Set env vars that server.js reads at module-load time
+    process.env.PORT        = String(PORT);
+    process.env.ELECTRON_RUN = '1';
+    process.env.UPLOADS_DIR = path.join(app.getPath('userData'), 'uploads');
+    process.env.OUTPUTS_DIR = path.join(app.getPath('userData'), 'outputs');
+    // docs/ is unpacked to asar.unpacked; tell server.js where to find them
+    process.env.DOCS_DIR    = isPackaged
+      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'docs')
+      : path.join(__dirname, '..', 'docs');
 
-    // Spawn server.js with the same Node that's bundled in Electron
-    serverProcess = spawn(process.execPath, [serverPath], {
-      env: {
-        ...process.env,
-        PORT:          String(PORT),
-        ELECTRON_RUN:  '1',
-        UPLOADS_DIR:   path.join(app.getPath('userData'), 'uploads'),
-        OUTPUTS_DIR:   path.join(app.getPath('userData'), 'outputs'),
-      },
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
+    try {
+      // server.js lives inside the asar — Electron's require() handles this
+      const serverPath = isPackaged
+        ? path.join(process.resourcesPath, 'app.asar', 'server.js')
+        : path.join(__dirname, '..', 'server.js');
+      serverModule = require(serverPath);
+      console.log('[main] server module loaded from', serverPath);
+    } catch (e) {
+      return reject(new Error('Failed to load server: ' + e.message));
+    }
 
-    serverProcess.stdout.on('data', d => {
-      const msg = d.toString().trim();
-      console.log('[server]', msg);
-      if (msg.includes('running at')) resolve();
-    });
-
-    serverProcess.stderr.on('data', d => console.error('[server-err]', d.toString()));
-
-    serverProcess.on('error', reject);
-    serverProcess.on('exit', code => {
-      console.log(`[server] exited with code ${code}`);
-      serverProcess = null;
-    });
-
-    // Fallback: resolve after polling that the server is up
+    // Poll until Express is accepting connections
     let attempts = 0;
     const poll = setInterval(() => {
       attempts++;
       http.get(`http://localhost:${PORT}/api/health`, res => {
         if (res.statusCode === 200) { clearInterval(poll); resolve(); }
       }).on('error', () => {
-        if (attempts > 30) { clearInterval(poll); reject(new Error('Server did not start')); }
+        if (attempts > 60) {
+          clearInterval(poll);
+          reject(new Error('Server did not become ready (60 s timeout)'));
+        }
       });
     }, 500);
   });
@@ -178,15 +179,13 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-  if (serverProcess) {
-    serverProcess.kill('SIGTERM');
-    serverProcess = null;
+  if (serverModule && serverModule.server) {
+    serverModule.server.close();
+    serverModule = null;
   }
+  if (serverProcess) { serverProcess.kill('SIGTERM'); serverProcess = null; }
 });
 
 app.on('will-quit', () => {
-  if (serverProcess) {
-    serverProcess.kill('SIGKILL');
-    serverProcess = null;
-  }
+  if (serverProcess) { serverProcess.kill('SIGKILL'); serverProcess = null; }
 });

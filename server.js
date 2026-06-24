@@ -35,7 +35,8 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'docs')));
+const DOCS_DIR = process.env.DOCS_DIR || path.join(__dirname, 'docs');
+app.use(express.static(DOCS_DIR));
 
 // ── File upload ────────────────────────────────────────────────────────────
 const storage = multer.diskStorage({
@@ -91,29 +92,35 @@ app.get('/api/probe/:jobId', (req, res) => {
 });
 
 // ── Probe-partial endpoint ────────────────────────────────────────────────
-// Accepts the first 2 MB of a file (just the container header) and runs
-// ffprobe on it. Returns stream info instantly without a full upload.
-// The temp file is deleted immediately after probing.
-const probeStorage = multer.diskStorage({
-  destination: UPLOAD_DIR,
-  filename: (req, file, cb) => cb(null, `probe-${uuidv4()}${path.extname(file.originalname)}`)
-});
-const probeUpload = multer({ storage: probeStorage, limits: { fileSize: 4 * 1024 * 1024 } }); // 4 MB max
+// Client sends raw bytes (first 2 MB of file) as application/octet-stream.
+// We pipe them directly into ffprobe stdin — no disk write, no temp file,
+// results come back in < 1 second even for large files.
+app.post('/api/probe-partial', (req, res) => {
+  const { spawn: spawnProbe } = require('child_process');
+  const ffprobe = spawnProbe(FFPROBE_BIN, [
+    '-v', 'quiet',
+    '-print_format', 'json',
+    '-show_streams',
+    '-show_format',
+    '-i', 'pipe:0'
+  ]);
 
-app.post('/api/probe-partial', probeUpload.single('chunk'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No chunk uploaded' });
-  const tmpPath = req.file.path;
-  const cleanup = () => fs.unlink(tmpPath, () => {});
+  let stdout = '';
+  let stderr = '';
+  ffprobe.stdout.on('data', d => { stdout += d; });
+  ffprobe.stderr.on('data', d => { stderr += d; });
 
-  exec(
-    `"${FFPROBE_BIN}" -v quiet -print_format json -show_streams -show_format "${tmpPath}"`,
-    (err, stdout) => {
-      cleanup();
-      if (err) return res.status(500).json({ error: 'Probe failed' });
-      try { res.json(JSON.parse(stdout)); }
-      catch { res.status(500).json({ error: 'Parse failed' }); }
-    }
-  );
+  ffprobe.on('close', code => {
+    if (!stdout.trim()) return res.status(500).json({ error: 'ffprobe returned no output', stderr });
+    try { res.json(JSON.parse(stdout)); }
+    catch { res.status(500).json({ error: 'Parse failed', stderr }); }
+  });
+
+  ffprobe.on('error', err => res.status(500).json({ error: err.message }));
+
+  // Pipe the raw request body straight into ffprobe — no buffering, no disk
+  req.pipe(ffprobe.stdin);
+  req.on('error', () => ffprobe.stdin.end());
 });
 
 // ── Upload endpoint ────────────────────────────────────────────────────────
@@ -459,6 +466,8 @@ process.on('exit', () => {
 });
 
 server.listen(PORT, () => {
-  console.log(`\n🎬  Video Transcoder running at http://localhost:${PORT}`);
-  console.log(`   Open the URL above in your browser.\n`);
+  console.log(`\n🎬  VideoForge server running at http://localhost:${PORT}`);
 });
+
+// Export for Electron main process
+module.exports = { server, io };

@@ -1,0 +1,21 @@
+{
+  "appId": "com.cr4zysh4rk.videoforge",
+  "appName": "VideoForge",
+  "webDir": "docs",
+  "android": {
+    "buildOptions": {
+      "keystorePath": null,
+      "keystorePassword": null,
+      "keystoreAlias": null,
+      "keystoreAliasPassword": null
+    }
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1000,
+      "backgroundColor": "#0d0f14",
+      "androidSplashResourceName": "splash",
+      "showSpinner": false
+    }
+  }
+}

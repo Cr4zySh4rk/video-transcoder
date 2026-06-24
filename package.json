@@ -1,7 +1,7 @@
 {
   "name": "videoforge",
   "version": "1.0.5",
-  "description": "Web-based video transcoder \u2014 x264 web-optimized MP4, hardware acceleration, audio dialogue/background mixing",
+  "description": "Web-based video transcoder — x264 web-optimized MP4, hardware acceleration, audio dialogue/background mixing",
   "main": "electron/main.js",
   "author": "Cr4zySh4rk",
   "license": "MIT",
@@ -14,7 +14,7 @@
   "build": {
     "appId": "com.cr4zysh4rk.videoforge",
     "productName": "VideoForge",
-    "copyright": "Copyright \u00a9 2024 Cr4zySh4rk",
+    "copyright": "Copyright © 2024 Cr4zySh4rk",
     "directories": {
       "output": "release"
     },
@@ -103,3 +103,6 @@
     "concurrently": "^8.2.2",
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3",
+    "wait-on": "^8.0.0"
+  }
+}

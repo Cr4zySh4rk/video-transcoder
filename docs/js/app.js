@@ -687,6 +687,19 @@ async function startTranscode() {
     state.jobId = jobId;
     state.socket.emit('join', jobId);
 
+    // 1b — Full probe: update metadata now that the full file is on the server.
+    //      Save and restore any track selections the user already made.
+    {
+      const savedAudio    = els.audioStream.value;
+      const savedSubtitle = els.subtitleSelect.value;
+      toast('Analyzing file…');
+      await probeFile(jobId);
+      if ([...els.audioStream.options].some(o => o.value === savedAudio))
+        els.audioStream.value = savedAudio;
+      if ([...els.subtitleSelect.options].some(o => o.value === savedSubtitle))
+        els.subtitleSelect.value = savedSubtitle;
+    }
+
     // 2 — Parse trim times
     const startTime = parseTrimTime(els.trimStart.value);
     const endTime   = parseTrimTime(els.trimEnd.value);
@@ -783,7 +796,7 @@ els.serverUrlInput.addEventListener('keydown', e => {
 // ── Mode switching ────────────────────────────────────────────────────────
 function switchMode(mode) {
   $('single-panel').style.display = mode === 'single' ? '' : 'none';
-  $('batch-panel').style.display  = mode === 'batch'  ? '' : 'none';
+  $('batch-panel').style.display  = mode === 'batch'  ? 'block' : 'none';
   $('tab-single').classList.toggle('active', mode === 'single');
   $('tab-batch').classList.toggle('active',  mode === 'batch');
 }

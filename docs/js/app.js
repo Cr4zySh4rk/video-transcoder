@@ -3,12 +3,13 @@
 
 // ── State ────────────────────────────────────────────────────────────────
 const state = {
-  serverUrl:  localStorage.getItem('serverUrl') || 'http://localhost:3000',
-  jobId:      null,
-  socket:     null,
-  connected:  false,
-  uploading:  false,
-  transcoding: false
+  serverUrl:   localStorage.getItem('serverUrl') || 'http://localhost:3000',
+  jobId:       null,
+  socket:      null,
+  connected:   false,
+  uploading:   false,
+  transcoding: false,
+  preUploaded: false   // true when file was pre-uploaded on select
 };
 
 // ── DOM refs ─────────────────────────────────────────────────────────────
@@ -155,25 +156,46 @@ async function detectHardware(url) {
     const data = await r.json();
     els.hwBadges.innerHTML = '';
 
-    // Always add software encoder
-    const soft = document.createElement('div');
-    soft.className = 'hw-badge';
-    soft.textContent = 'Software x264';
-    els.hwBadges.appendChild(soft);
+    // Priority order: NVIDIA > AMD > Intel > Apple > ARM > Software
+    const PRIORITY = ['h264_nvenc', 'h264_amf', 'h264_qsv', 'h264_videotoolbox', 'h264_v4l2m2m'];
 
-    if (data.encoders && data.encoders.length) {
-      data.encoders.forEach(enc => {
-        const badge = document.createElement('div');
-        badge.className = 'hw-badge';
-        badge.style.cssText = 'background:rgba(124,90,247,.12);border-color:rgba(124,90,247,.3);color:#a78bfa';
-        badge.textContent = enc.label;
-        els.hwBadges.appendChild(badge);
+    // Reset encoder dropdown to just the software option
+    while (els.encoderSelect.options.length > 1) els.encoderSelect.remove(1);
 
-        // Add to encoder dropdown
+    const detected = data.encoders || [];
+
+    // Auto-select the highest-priority available GPU encoder
+    const best = PRIORITY.find(id => detected.some(e => e.id === id));
+
+    if (detected.length) {
+      detected.forEach(enc => {
         const opt = document.createElement('option');
         opt.value = enc.id;
         opt.textContent = enc.label;
         els.encoderSelect.appendChild(opt);
+      });
+
+      if (best) {
+        els.encoderSelect.value = best;
+      }
+    }
+
+    // Rebuild hw badges — highlight the selected encoder
+    const selectedId = els.encoderSelect.value;
+
+    // Software badge
+    const soft = document.createElement('div');
+    soft.className = 'hw-badge' + (selectedId === 'libx264' ? ' hw-badge-active' : '');
+    soft.textContent = 'Software x264';
+    els.hwBadges.appendChild(soft);
+
+    if (detected.length) {
+      detected.forEach(enc => {
+        const badge = document.createElement('div');
+        const isActive = enc.id === selectedId;
+        badge.className = 'hw-badge hw-badge-gpu' + (isActive ? ' hw-badge-active' : '');
+        badge.textContent = enc.label + (isActive ? ' ✓' : '');
+        els.hwBadges.appendChild(badge);
       });
     } else {
       const nb = document.createElement('div');
@@ -182,6 +204,24 @@ async function detectHardware(url) {
       nb.textContent = 'No GPU encoders detected';
       els.hwBadges.appendChild(nb);
     }
+
+    // Keep badges in sync when user manually changes encoder
+    els.encoderSelect.addEventListener('change', () => {
+      const sel = els.encoderSelect.value;
+      document.querySelectorAll('.hw-badge').forEach(b => b.classList.remove('hw-badge-active'));
+      document.querySelectorAll('.hw-badge').forEach(b => {
+        if (b.textContent.startsWith('Software') && sel === 'libx264') b.classList.add('hw-badge-active');
+      });
+      detected.forEach((enc, i) => {
+        const badges = document.querySelectorAll('.hw-badge-gpu');
+        if (badges[i]) {
+          const active = enc.id === sel;
+          badges[i].classList.toggle('hw-badge-active', active);
+          badges[i].textContent = enc.label + (active ? ' ✓' : '');
+        }
+      });
+    });
+
   } catch (e) {
     console.warn('HW detect failed', e);
   }
@@ -195,12 +235,39 @@ function handleFile(file) {
     return;
   }
 
-  els.fileName.textContent = file.name;
+  els.fileName.textContent  = file.name;
   els.fileSize.textContent  = formatBytes(file.size);
   els.fileInfo.classList.add('visible');
-  els.transcodeBtn.disabled = false;
-  els.probeChips.innerHTML   = '';
-  state.file = file;
+  els.transcodeBtn.disabled = true;  // re-enabled after pre-upload
+  els.probeChips.innerHTML  = '<span class="chip chip-info">Analyzing…</span>';
+  state.file        = file;
+  state.jobId       = null;
+  state.preUploaded = false;
+
+  // Pre-upload immediately so probe info appears before the user clicks Transcode
+  if (!state.connected) {
+    els.transcodeBtn.disabled = false;
+    els.probeChips.innerHTML  = '';
+    return;
+  }
+
+  (async () => {
+    try {
+      const fd = new FormData();
+      fd.append('video', file);
+      const r = await fetch(`${state.serverUrl}/api/upload`, { method: 'POST', body: fd });
+      if (!r.ok) throw new Error('Upload failed');
+      const { jobId } = await r.json();
+      state.jobId       = jobId;
+      state.preUploaded = true;
+      state.socket.emit('join', jobId);
+      await probeFile(jobId);         // fills probe chips (audio tracks, codec, etc.)
+      els.transcodeBtn.disabled = false;
+    } catch (e) {
+      els.probeChips.innerHTML  = '';
+      els.transcodeBtn.disabled = false;
+    }
+  })();
 }
 
 els.dropZone.addEventListener('dragover', e => {
@@ -257,25 +324,26 @@ async function startTranscode() {
   els.progressTime.textContent = '--:--';
 
   try {
-    // 1 — Upload
-    toast('Uploading file…');
-    const formData = new FormData();
-    formData.append('video', state.file);
+    // 1 — Upload (skip if file was pre-uploaded on select)
+    if (!state.preUploaded || !state.jobId) {
+      toast('Uploading file…');
+      const formData = new FormData();
+      formData.append('video', state.file);
 
-    const upRes = await fetch(`${state.serverUrl}/api/upload`, {
-      method: 'POST',
-      body: formData
-    });
+      const upRes = await fetch(`${state.serverUrl}/api/upload`, {
+        method: 'POST',
+        body: formData
+      });
 
-    if (!upRes.ok) throw new Error('Upload failed');
-    const { jobId } = await upRes.json();
-    state.jobId = jobId;
-
-    // Join socket room
-    state.socket.emit('join', jobId);
-
-    // Probe file info
-    probeFile(jobId);
+      if (!upRes.ok) throw new Error('Upload failed');
+      const { jobId } = await upRes.json();
+      state.jobId = jobId;
+      state.socket.emit('join', jobId);
+      probeFile(jobId);
+    } else {
+      // Already uploaded — ensure we're in the socket room
+      state.socket.emit('join', state.jobId);
+    }
 
     // 2 — Transcode
     toast('Transcoding started…');

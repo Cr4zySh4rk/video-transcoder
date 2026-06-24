@@ -112,7 +112,7 @@ function buildAudioFilter(opts) {
     dialogueBoost    = 0,   // –12 to +12 dB  — boosts speech-band EQ
     backgroundLevel  = 0,   // –24 to  0 dB  — attenuates non-speech bands
     speechEnhance    = false,
-    normalize        = true,
+    normalize        = false,
     audioStream      = 0    // which audio stream index to use
   } = opts;
 
@@ -143,7 +143,7 @@ function buildAudioFilter(opts) {
 
   // Loudness normalisation (EBU R128)
   if (normalize) {
-    filters.push('loudnorm=I=-16:TP=-1.5:LRA=11');
+    filters.push('dynaudnorm=f=500:g=31:p=0.95:m=10');
   }
 
   return filters.join(',');
@@ -162,7 +162,7 @@ app.post('/api/transcode', (req, res) => {
     dialogueBoost   = 0,
     backgroundLevel = 0,
     speechEnhance   = false,
-    normalize       = true,
+    normalize       = false,
     // multi-track
     audioStreamIndex = 0
   } = req.body;

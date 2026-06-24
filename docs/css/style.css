@@ -317,9 +317,20 @@ input[type="range"]:hover::-webkit-slider-thumb {
   border-radius: 20px;
   font-size: 11px;
   font-weight: 600;
-  background: rgba(79,142,247,.12);
-  border: 1px solid rgba(79,142,247,.3);
-  color: var(--accent);
+  background: rgba(79,142,247,.08);
+  border: 1px solid rgba(79,142,247,.2);
+  color: var(--muted);
+  transition: background .15s, border-color .15s, color .15s;
+}
+.hw-badge-gpu {
+  background: rgba(124,90,247,.08);
+  border-color: rgba(124,90,247,.2);
+}
+.hw-badge-active {
+  background: rgba(99,102,241,.20) !important;
+  border-color: rgba(99,102,241,.6) !important;
+  color: #a5b4fc !important;
+  box-shadow: 0 0 0 2px rgba(99,102,241,.15);
 }
 
 /* ── Audio meter visual ───────────────────────────────────────────────── */

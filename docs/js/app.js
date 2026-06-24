@@ -84,9 +84,9 @@ function fmtTime(s) {
 }
 
 // ── Server connection ─────────────────────────────────────────────────────
-async function checkServer(url) {
+async function checkServer(url, timeoutMs = 3000) {
   try {
-    const r = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(3000) });
+    const r = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(timeoutMs) });
     if (!r.ok) throw new Error('bad status');
     return true;
   } catch {
@@ -94,9 +94,48 @@ async function checkServer(url) {
   }
 }
 
-async function connectToServer(url) {
+// Silent 5s timeout — no countdown displayed, just fires after the delay
+let _countdownTimer = null;
+function startCountdown(seconds, onExpire) {
+  clearInterval(_countdownTimer);
+  els.statusLabel.textContent = 'Connecting…';
+  _countdownTimer = setTimeout(onExpire, seconds * 1000);
+}
+
+function stopCountdown() {
+  clearTimeout(_countdownTimer);
+}
+
+// Show the "not connected" state and scroll to Get Started
+function showNotConnected(message = 'Server not found') {
+  state.connected = false;
+  els.statusDot.classList.remove('online');
+  els.statusLabel.textContent = message;
+  els.connectBanner.style.display = 'none';
+
+  // Show the retry callout in the Get Started section
+  const callout = document.getElementById('gs-retry-callout');
+  if (callout) callout.style.display = 'block';
+
+  // Smooth scroll to Get Started section
+  const gs = document.getElementById('get-started');
+  if (gs) gs.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function connectToServer(url, isManual = false) {
   url = url.replace(/\/$/, '');
-  const ok = await checkServer(url);
+
+  // Show countdown only on the initial auto-attempt, not manual retries
+  if (!isManual) {
+    startCountdown(5, () => {
+      showNotConnected('Server not reachable');
+    });
+  } else {
+    els.statusLabel.textContent = 'Connecting…';
+  }
+
+  const ok = await checkServer(url, isManual ? 4000 : 4500);
+  stopCountdown();
 
   if (ok) {
     state.serverUrl = url;
@@ -106,6 +145,10 @@ async function connectToServer(url) {
     els.statusDot.classList.add('online');
     els.statusLabel.textContent = `Connected — ${url}`;
     els.connectBanner.style.display = 'none';
+
+    // Hide retry callout if visible
+    const callout = document.getElementById('gs-retry-callout');
+    if (callout) callout.style.display = 'none';
 
     // Attach Socket.io
     if (state.socket) state.socket.disconnect();
@@ -117,16 +160,15 @@ async function connectToServer(url) {
     state.socket.on('error',    onTranscodeError);
     attachBatchSocketEvents(state.socket);
 
-    // Detect hardware encoders
     detectHardware(url);
     toast('Connected to local server', 'success');
     if (batchState.files.length > 0 && !batchState.running) batchEls.startBtn.disabled = false;
+
+    // Scroll back to top if we had scrolled down
+    if (isManual) window.scrollTo({ top: 0, behavior: 'smooth' });
   } else {
-    state.connected = false;
-    els.statusDot.classList.remove('online');
-    els.statusLabel.textContent = 'Not connected';
-    els.connectBanner.style.display = 'block';
-    toast('Cannot reach local server. Is it running?', 'error');
+    showNotConnected('Server not reachable');
+    if (isManual) toast('Still can\'t reach the server. Is the script running?', 'error');
   }
 }
 
@@ -412,7 +454,7 @@ function resetState() {
 els.serverUrlInput.value = state.serverUrl;
 
 els.connectBtn.addEventListener('click', () => {
-  connectToServer(els.serverUrlInput.value.trim() || 'http://localhost:3000');
+  connectToServer(els.serverUrlInput.value.trim() || 'http://localhost:3000', true);
 });
 
 els.serverUrlInput.addEventListener('keydown', e => {
@@ -627,45 +669,4 @@ batchEls.clearBtn.addEventListener('click', () => {
   batchState.items  = [];
   batchState.batchId = null;
   batchEls.queue.style.display = 'none';
-  batchEls.startBtn.disabled   = true;
-  batchEls.fileInput.value     = '';
-});
-
-// Batch socket events (attached once server connects)
-function attachBatchSocketEvents(socket) {
-  socket.on('batch:file-start', ({ index }) => {
-    updateQueueItem(index, { status: 'running', percent: 0 });
-  });
-
-  socket.on('batch:progress', ({ index, percent }) => {
-    updateQueueItem(index, { percent });
-  });
-
-  socket.on('batch:file-done', ({ index, downloadUrl }) => {
-    updateQueueItem(index, { status: 'done', percent: 100, downloadUrl });
-  });
-
-  socket.on('batch:file-error', ({ index }) => {
-    updateQueueItem(index, { status: 'error' });
-  });
-
-  socket.on('batch:done', ({ total }) => {
-    batchState.running = false;
-    batchEls.startBtn.disabled  = false;
-    batchEls.cancelBtn.disabled = true;
-    toast(`Batch complete — ${total} files transcoded`, 'success', 8000);
-  });
-}
-
-// ── Init ──────────────────────────────────────────────────────────────────
-(async () => {
-  const ok = await checkServer(state.serverUrl);
-  if (ok) {
-    connectToServer(state.serverUrl);
-  } else {
-    els.connectBanner.style.display = 'block';
-    els.statusLabel.textContent = 'Not connected — start the local server';
-    toast('Start the local server: node server.js', 'info', 8000);
-  }
-  els.transcodeBtn.disabled = true;
-})();
+  batchEls.startBtn.disabled  

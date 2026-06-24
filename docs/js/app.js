@@ -246,7 +246,6 @@ function handleFile(file) {
   state.jobId       = null;
   state.preUploaded = false;
 
-  // Pre-upload immediately so probe info appears before the user clicks Transcode
   if (!state.connected) {
     els.transcodeBtn.disabled = false;
     els.probeChips.innerHTML  = '';
@@ -254,20 +253,26 @@ function handleFile(file) {
     return;
   }
 
+  // Send only the first 2 MB (container header) — ffprobe reads stream info
+  // from the header alone so this is instant regardless of file size.
   (async () => {
     try {
-      const fd = new FormData();
-      fd.append('video', file);
-      const r = await fetch(`${state.serverUrl}/api/upload`, { method: 'POST', body: fd });
-      if (!r.ok) throw new Error('Upload failed');
-      const { jobId } = await r.json();
-      state.jobId       = jobId;
-      state.preUploaded = true;
-      state.socket.emit('join', jobId);
-      await probeFile(jobId);         // fills probe chips (audio tracks, codec, etc.)
+      const HEADER_BYTES = 2 * 1024 * 1024; // 2 MB
+      const chunk = file.slice(0, HEADER_BYTES);
+      const ext   = file.name.slice(file.name.lastIndexOf('.')) || '.mp4';
+      const fd    = new FormData();
+      fd.append('chunk', new File([chunk], 'header' + ext, { type: file.type }));
+
+      const r = await fetch(`${state.serverUrl}/api/probe-partial`, { method: 'POST', body: fd });
+      if (!r.ok) throw new Error(`Probe returned ${r.status}`);
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
+      renderProbeData(data);              // populate chips + audio select
       els.transcodeBtn.disabled = false;
     } catch (e) {
+      console.warn('Partial probe failed:', e.message);
       els.probeChips.innerHTML  = '';
+      els.audioStream.innerHTML = '<option value="0">Track 1 (default)</option>';
       els.transcodeBtn.disabled = false;
     }
   })();
@@ -327,31 +332,25 @@ async function startTranscode() {
   els.progressTime.textContent = '--:--';
 
   try {
-    // 1 — Upload (skip if file was pre-uploaded on select)
-    if (!state.preUploaded || !state.jobId) {
-      toast('Uploading file…');
-      const formData = new FormData();
-      formData.append('video', state.file);
+    // 1 — Upload full file
+    toast('Uploading file…');
+    const formData = new FormData();
+    formData.append('video', state.file);
 
-      const upRes = await fetch(`${state.serverUrl}/api/upload`, {
-        method: 'POST',
-        body: formData
-      });
+    const upRes = await fetch(`${state.serverUrl}/api/upload`, {
+      method: 'POST',
+      body: formData
+    });
 
-      if (!upRes.ok) throw new Error('Upload failed');
-      const { jobId } = await upRes.json();
-      state.jobId = jobId;
-      state.socket.emit('join', jobId);
-      probeFile(jobId);
-    } else {
-      // Already uploaded — ensure we're in the socket room
-      state.socket.emit('join', state.jobId);
-    }
+    if (!upRes.ok) throw new Error('Upload failed');
+    const { jobId } = await upRes.json();
+    state.jobId = jobId;
+    state.socket.emit('join', jobId);
 
     // 2 — Transcode
     toast('Transcoding started…');
     const opts = {
-      jobId,
+      jobId: state.jobId,
       encoder:          els.encoderSelect.value,
       preset:           els.presetSelect.value,
       crf:              parseInt(els.crfInput.value),
@@ -381,87 +380,74 @@ async function startTranscode() {
   }
 }
 
+// Render ffprobe JSON data into the UI (chips + audio track selector).
+// Called from both the partial-probe path (on file select) and the
+// full-probe path (after upload, to fill in duration/size if missing).
+function renderProbeData(data) {
+  const streams = data.streams || [];
+  const fmt     = data.format  || {};
+  const vStream = streams.find(s => s.codec_type === 'video');
+  const aStreams = streams.filter(s => s.codec_type === 'audio');
+
+  els.probeChips.innerHTML = '';
+
+  if (vStream) {
+    addChip(vStream.codec_name.toUpperCase(), 'video codec');
+    if (vStream.width) addChip(`${vStream.width}×${vStream.height}`, 'resolution');
+    if (vStream.r_frame_rate) {
+      const [n, d] = vStream.r_frame_rate.split('/');
+      const fps = Math.round((n / d) * 10) / 10;
+      addChip(`${fps} fps`, 'frame rate');
+    }
+  }
+
+  if (fmt.duration) addChip(fmtTime(parseFloat(fmt.duration)), 'duration');
+  if (fmt.size)     addChip(formatBytes(parseInt(fmt.size)), 'file size');
+
+  // Audio track selector
+  els.audioStream.innerHTML = '';
+  aStreams.forEach((s, i) => {
+    const parts = [];
+    if (s.codec_name) parts.push(s.codec_name.toUpperCase());
+    const ch = s.channels;
+    if (ch) parts.push(ch === 1 ? 'Mono' : ch === 2 ? 'Stereo' : ch === 6 ? '5.1' : ch === 8 ? '7.1' : `${ch}ch`);
+    if (s.bit_rate) parts.push(`${Math.round(parseInt(s.bit_rate) / 1000)} kbps`);
+    const lang = s.tags?.language;
+    if (lang && lang !== 'und') parts.push(`[${lang.toUpperCase()}]`);
+    const title = s.tags?.title || s.tags?.handler_name;
+    if (title && title.length < 40) parts.push(`"${title}"`);
+
+    const label = parts.join(' ') || `Stream ${s.index ?? i}`;
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `Track ${i + 1}  —  ${label}`;
+    els.audioStream.appendChild(opt);
+    addChip(`Track ${i + 1}: ${label}`, 'audio');
+  });
+
+  if (aStreams.length === 0) {
+    els.audioStream.innerHTML = '<option value="0">No audio detected</option>';
+    addChip('No audio', 'audio');
+  } else if (aStreams.length > 1) {
+    els.audioStream.style.borderColor = 'rgba(99,102,241,.5)';
+    els.audioStream.title = `${aStreams.length} audio tracks — pick the one you want`;
+  } else {
+    els.audioStream.style.borderColor = '';
+    els.audioStream.title = '';
+  }
+}
+
 async function probeFile(jobId) {
-  // Mark the select as loading
-  els.audioStream.innerHTML = '<option value="0" disabled>Detecting tracks…</option>';
   try {
     const r = await fetch(`${state.serverUrl}/api/probe/${jobId}`);
     if (!r.ok) throw new Error(`Probe returned ${r.status}`);
     const data = await r.json();
     if (data.error) throw new Error(data.error);
-    els.probeChips.innerHTML = '';
-
-    const streams = data.streams || [];
-    const fmt     = data.format  || {};
-    const vStream = streams.find(s => s.codec_type === 'video');
-    const aStreams = streams.filter(s => s.codec_type === 'audio');
-
-    if (vStream) {
-      addChip(`${vStream.codec_name.toUpperCase()}`, 'video codec');
-      if (vStream.width) addChip(`${vStream.width}×${vStream.height}`, 'resolution');
-      if (vStream.r_frame_rate) {
-        const [n, d] = vStream.r_frame_rate.split('/');
-        addChip(`${Math.round(n / d)} fps`, 'frame rate');
-      }
-    }
-
-    if (fmt.duration) addChip(fmtTime(parseFloat(fmt.duration)), 'duration');
-    if (fmt.size)     addChip(formatBytes(parseInt(fmt.size)), 'file size');
-
-    // Populate audio stream selector with rich track info
-    els.audioStream.innerHTML = '';
-    aStreams.forEach((s, i) => {
-      const parts = [];
-
-      // Codec
-      if (s.codec_name) parts.push(s.codec_name.toUpperCase());
-
-      // Channels
-      const ch = s.channels;
-      if (ch) {
-        const chLabel = ch === 1 ? 'Mono' : ch === 2 ? 'Stereo'
-          : ch === 6 ? '5.1' : ch === 8 ? '7.1' : `${ch}ch`;
-        parts.push(chLabel);
-      }
-
-      // Bitrate
-      if (s.bit_rate) {
-        parts.push(`${Math.round(parseInt(s.bit_rate) / 1000)} kbps`);
-      }
-
-      // Language
-      const lang = s.tags?.language;
-      if (lang && lang !== 'und') parts.push(`[${lang.toUpperCase()}]`);
-
-      // Title (e.g. "Director's Commentary", "English", "Surround")
-      const title = s.tags?.title || s.tags?.handler_name;
-      if (title && title.length < 40) parts.push(`"${title}"`);
-
-      const label = parts.join(' ') || `Stream ${s.index ?? i}`;
-
-      const opt = document.createElement('option');
-      opt.value = i;
-      opt.textContent = `Track ${i + 1}  —  ${label}`;
-      els.audioStream.appendChild(opt);
-
-      addChip(`Track ${i + 1}: ${label}`, 'audio');
-    });
-
-    if (aStreams.length === 0) addChip('No audio', 'audio');
-    else if (aStreams.length > 1) {
-      // Highlight the selector so the user notices multiple tracks
-      els.audioStream.style.borderColor = 'rgba(99,102,241,.5)';
-      els.audioStream.title = `${aStreams.length} audio tracks detected — pick the one you want`;
-    } else {
-      els.audioStream.style.borderColor = '';
-      els.audioStream.title = '';
-    }
+    renderProbeData(data);
   } catch (e) {
     console.warn('Probe failed', e);
-    // Fallback: restore a usable select option so transcoding still works
     els.audioStream.innerHTML = '<option value="0">Track 1 (default)</option>';
     els.probeChips.innerHTML  = '<span class="chip chip-warn">Could not read file metadata</span>';
-    els.transcodeBtn.disabled  = false;
   }
 }
 

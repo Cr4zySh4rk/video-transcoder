@@ -90,6 +90,32 @@ app.get('/api/probe/:jobId', (req, res) => {
   );
 });
 
+// ── Probe-partial endpoint ────────────────────────────────────────────────
+// Accepts the first 2 MB of a file (just the container header) and runs
+// ffprobe on it. Returns stream info instantly without a full upload.
+// The temp file is deleted immediately after probing.
+const probeStorage = multer.diskStorage({
+  destination: UPLOAD_DIR,
+  filename: (req, file, cb) => cb(null, `probe-${uuidv4()}${path.extname(file.originalname)}`)
+});
+const probeUpload = multer({ storage: probeStorage, limits: { fileSize: 4 * 1024 * 1024 } }); // 4 MB max
+
+app.post('/api/probe-partial', probeUpload.single('chunk'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No chunk uploaded' });
+  const tmpPath = req.file.path;
+  const cleanup = () => fs.unlink(tmpPath, () => {});
+
+  exec(
+    `"${FFPROBE_BIN}" -v quiet -print_format json -show_streams -show_format "${tmpPath}"`,
+    (err, stdout) => {
+      cleanup();
+      if (err) return res.status(500).json({ error: 'Probe failed' });
+      try { res.json(JSON.parse(stdout)); }
+      catch { res.status(500).json({ error: 'Parse failed' }); }
+    }
+  );
+});
+
 // ── Upload endpoint ────────────────────────────────────────────────────────
 app.post('/api/upload', upload.single('video'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });

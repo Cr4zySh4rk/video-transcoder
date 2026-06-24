@@ -2,126 +2,142 @@ name: Build & Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
-permissions:
-  contents: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  # ── macOS ─────────────────────────────────────────────────────────────────
+  # ── macOS universal DMG ──────────────────────────────────────────────────
   build-mac:
+    name: macOS (universal)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: 20
+          cache: npm
+
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/electron
+          key: electron-mac-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build macOS Universal DMG
-        run: npx electron-builder --mac dmg --universal
+      - name: Generate macOS ICNS icon
+        run: |
+          mkdir -p electron/icons/icon.iconset
+          for size in 16 32 64 128 256 512; do
+            sips -z $size $size electron/icons/icon.png --out electron/icons/icon.iconset/icon_${size}x${size}.png
+          done
+          sips -z 32  32  electron/icons/icon.png --out electron/icons/icon.iconset/icon_16x16@2x.png
+          sips -z 64  64  electron/icons/icon.png --out electron/icons/icon.iconset/icon_32x32@2x.png
+          sips -z 256 256 electron/icons/icon.png --out electron/icons/icon.iconset/icon_128x128@2x.png
+          sips -z 512 512 electron/icons/icon.png --out electron/icons/icon.iconset/icon_256x256@2x.png
+          iconutil -c icns electron/icons/icon.iconset --output electron/icons/icon.icns
+
+      - name: Build macOS DMG (universal)
+        run: npx electron-builder --mac dmg --universal --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          CSC_NAME: "-"
-          ELECTRON_BUILDER_PUBLISH: never
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Clean build artifacts
-        run: |
-          rm -f release/*.blockmap release/*.yml release/*.yaml
-          ls -lh release/
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
-          name: mac
+          name: mac-dmg
           path: release/*.dmg
           if-no-files-found: error
+          retention-days: 30
 
-  # ── Windows ───────────────────────────────────────────────────────────────
+  # ── Windows NSIS + portable ──────────────────────────────────────────────
   build-windows:
+    name: Windows (x64)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: 20
+          cache: npm
+
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: '%LOCALAPPDATA%\electron\Cache'
+          key: electron-win-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Windows (installer + portable)
-        run: npx electron-builder --win nsis portable --x64
+      - name: Build Windows (NSIS installer + portable)
+        run: npx electron-builder --win nsis portable --x64 --publish never
         env:
-          ELECTRON_BUILDER_PUBLISH: never
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Clean build artifacts
-        shell: pwsh
-        run: |
-          Remove-Item release\*.blockmap -ErrorAction SilentlyContinue
-          Remove-Item release\*.yml -ErrorAction SilentlyContinue
-          Get-ChildItem release\
 
       - name: Upload Windows executables
         uses: actions/upload-artifact@v4
         with:
-          name: windows
+          name: windows-installers
           path: release/*.exe
           if-no-files-found: error
+          retention-days: 30
 
-  # ── Linux ─────────────────────────────────────────────────────────────────
+  # ── Linux AppImage + tar.gz ──────────────────────────────────────────────
   build-linux:
-    runs-on: ubuntu-latest
+    name: Linux (x64)
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: 20
+          cache: npm
+
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: electron-linux-${{ hashFiles('package-lock.json') }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            rpm libarchive-tools \
+            libgtk-3-dev libnotify-dev libnss3 libxss1 libxtst6
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Linux build deps
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y rpm libarchive-tools
-
       - name: Build Linux (AppImage + tar.gz)
-        run: npx electron-builder --linux AppImage tar.gz --x64
+        run: npx electron-builder --linux AppImage tar.gz --x64 --publish never
         env:
-          ELECTRON_BUILDER_PUBLISH: never
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Clean build artifacts
-        run: |
-          rm -f release/*.blockmap release/*.yml release/*.yaml
-          ls -lh release/
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux
+          name: linux-packages
           path: |
             release/*.AppImage
             release/*.tar.gz
           if-no-files-found: error
+          retention-days: 30
 
-  # ── GitHub Pages deploy ───────────────────────────────────────────────────
+  # ── Deploy GitHub Pages ──────────────────────────────────────────────────
   deploy-pages:
+    name: Deploy GitHub Pages
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -132,29 +148,27 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload docs/ to Pages
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: docs/
-
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
 
-  # ── Create Release (only on tags) ─────────────────────────────────────────
-  create-release:
+  # ── Create GitHub Release (tags only) ───────────────────────────────────
+  release:
+    name: Publish Release
     needs: [build-mac, build-windows, build-linux]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts/
+          merge-multiple: true
 
       - name: List artifacts
         run: find artifacts/ -type f | sort
@@ -162,6 +176,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: VideoForge ${{ github.ref_name }}
           generate_release_notes: true
           files: |
             artifacts/**/*.dmg
@@ -171,47 +186,28 @@ jobs:
           body: |
             ## VideoForge ${{ github.ref_name }}
 
-            Hardware-accelerated video transcoder — converts any format to x264 web-optimized MP4.
-            Includes audio dialogue/background level controls and EBU R128 loudness normalization.
+            Hardware-accelerated video transcoder. Converts any format to x264 web-optimized MP4.
             **FFmpeg is bundled — no separate install required.**
 
-            ---
-
             ### 🌐 Web Interface
-            Use directly in your browser (requires the local server running):
-            **https://Cr4zySh4rk.github.io/video-transcoder/**
-
-            ---
+            https://cr4zysh4rk.github.io/video-transcoder/
 
             ### 💾 Downloads
 
-            #### macOS
-            | File | Notes |
-            |------|-------|
-            | `*-universal.dmg` | Universal binary — Intel + Apple Silicon |
-
-            > First launch: right-click → Open → Open (Gatekeeper bypass, one time only)
-
-            #### Windows
-            | File | Notes |
-            |------|-------|
-            | `*Setup*.exe` | NSIS installer with Start Menu shortcut |
-            | `*Portable*.exe` | No install needed, run from anywhere |
-
-            #### Linux
-            | File | Notes |
-            |------|-------|
-            | `*.AppImage` | Single-file, run anywhere (chmod +x first) |
-            | `*.tar.gz` | Extract and run the binary |
-
-            ---
+            | Platform | File | Notes |
+            |----------|------|-------|
+            | 🍎 macOS | `*-universal.dmg` | Universal — Apple Silicon + Intel. Right-click → Open on first launch. |
+            | 🪟 Windows | `*Setup*.exe` | NSIS installer with Start Menu shortcut |
+            | 🪟 Windows | `*Portable*.exe` | No install — run from anywhere |
+            | 🐧 Linux | `*.AppImage` | `chmod +x`, run from anywhere |
+            | 🐧 Linux | `*.tar.gz` | Extract and run |
 
             ### Features
-            - Accepts any video format (MKV, MOV, AVI, TS, MTS, WMV, FLV, WebM…)
-            - Outputs x264 web-optimized MP4 with `-movflags +faststart`
-            - Hardware acceleration: NVIDIA NVENC, AMD AMF, Intel QSV, Apple VideoToolbox
-            - Dialogue/speech level boost (300 Hz–4 kHz EQ)
-            - Background music level control (non-speech band attenuation)
+            - Any input → x264 web-optimized MP4 with `-movflags +faststart`
+            - NVIDIA NVENC, AMD AMF, Intel QSV, Apple VideoToolbox GPU acceleration
+            - Dialogue boost + background attenuation audio controls
             - EBU R128 loudness normalization
-            - Multi-track audio selection
-            - Real-time progress via WebSocket
+            - Batch folder transcoding
+            - Real-time progress
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

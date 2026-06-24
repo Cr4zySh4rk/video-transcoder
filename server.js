@@ -28,7 +28,7 @@ const FFPROBE_BIN = process.env.FFPROBE_PATH || 'ffprobe';
 // ── CORS middleware (allow GitHub Pages frontend) ──────────────────────────
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Headers', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
@@ -98,7 +98,7 @@ app.get('/api/probe/:jobId', (req, res) => {
 // Temp file is deleted immediately after ffprobe exits.
 app.post('/api/probe-partial', (req, res) => {
   const os   = require('os');
-  const ext  = (req.headers['x-filename'] || '.mkv').replace(/.*(\.\w+)$/, '$1');
+  const ext  = (req.query.ext || '.mkv').replace(/[^.\w]/g, '');
   const tmp  = path.join(os.tmpdir(), `vf-probe-${uuidv4()}${ext}`);
   const out  = fs.createWriteStream(tmp);
   const MAX  = 4 * 1024 * 1024; // buffer up to 4 MB

@@ -253,26 +253,13 @@ function handleFile(file) {
     return;
   }
 
-  // Send the first 2 MB of the file as raw bytes directly to ffprobe via the
-  // server — no disk write on the server, no FormData overhead.
-  // ffprobe reads all stream/track info from the container header which is
-  // always in the first few hundred KB, so this returns in < 1 second.
-  if (!state.connected) {
-    els.probeChips.innerHTML  = '';
-    els.audioStream.innerHTML = '<option value="0">Track 1 (default)</option>';
-    els.transcodeBtn.disabled = false;
-    return;
-  }
   (async () => {
     try {
-      const HEADER = 2 * 1024 * 1024; // 2 MB — enough for any container header
-      const ext = file.name.slice(file.name.lastIndexOf('.')); // e.g. ".mkv"
-      const r = await fetch(`${state.serverUrl}/api/probe-partial`, {
+      const HEADER = 2 * 1024 * 1024;
+      const ext    = encodeURIComponent(file.name.slice(file.name.lastIndexOf('.')));
+      const r = await fetch(`${state.serverUrl}/api/probe-partial?ext=${ext}`, {
         method:  'POST',
-        headers: {
-          'Content-Type': 'application/octet-stream',
-          'X-Filename':   ext
-        },
+        headers: { 'Content-Type': 'application/octet-stream' },
         body:    file.slice(0, HEADER)
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);

@@ -1,7 +1,7 @@
 {
   "name": "videoforge",
-  "version": "1.0.5",
-  "description": "Web-based video transcoder — x264 web-optimized MP4, hardware acceleration, audio dialogue/background mixing",
+  "version": "1.1.0",
+  "description": "Web-based video transcoder — H.264/H.265/VP9/AV1, hardware acceleration, audio controls, batch processing",
   "main": "electron/main.js",
   "author": "Cr4zySh4rk",
   "license": "MIT",
@@ -31,29 +31,14 @@
     "asar": true,
     "win": {
       "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
+        { "target": "nsis",     "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
       ],
       "icon": "electron/icons/icon.png"
     },
     "mac": {
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "universal"
-          ]
-        }
+        { "target": "dmg", "arch": ["universal"] }
       ],
       "icon": "electron/icons/icon.icns",
       "category": "public.app-category.utilities",
@@ -62,18 +47,8 @@
     },
     "linux": {
       "target": [
-        {
-          "target": "tar.gz",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        }
+        { "target": "tar.gz",   "arch": ["x64"] },
+        { "target": "AppImage", "arch": ["x64"] }
       ],
       "icon": "electron/icons/",
       "category": "AudioVideo"
@@ -100,6 +75,9 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
     "concurrently": "^8.2.2",
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3",

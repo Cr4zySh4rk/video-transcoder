@@ -74,12 +74,10 @@ function startServer() {
       : path.join(__dirname, '..', 'docs');
 
     try {
-      // server.js is in asarUnpack so it's a real on-disk file the OS can load
-      // (plain asar paths can't be reliably required when the file itself spawns
-      //  child processes or is loaded by a forked Node context).
-      const serverPath = isPackaged
-        ? path.join(process.resourcesPath, 'app.asar.unpacked', 'server.js')
-        : path.join(__dirname, '..', 'server.js');
+      // Use __dirname-relative path so Electron's patched require() resolves
+      // node_modules correctly from inside the asar archive.
+      // __dirname here is .../app.asar/electron/ so '../server.js' → app.asar/server.js
+      const serverPath = path.join(__dirname, '..', 'server.js');
       console.log('[main] loading server from', serverPath);
       serverModule = require(serverPath);
       console.log('[main] server module loaded');

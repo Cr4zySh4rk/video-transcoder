@@ -74,11 +74,15 @@ function startServer() {
       : path.join(__dirname, '..', 'docs');
 
     try {
+      // server.js is in asarUnpack so it's a real on-disk file the OS can load
+      // (plain asar paths can't be reliably required when the file itself spawns
+      //  child processes or is loaded by a forked Node context).
       const serverPath = isPackaged
-        ? path.join(process.resourcesPath, 'app.asar', 'server.js')
+        ? path.join(process.resourcesPath, 'app.asar.unpacked', 'server.js')
         : path.join(__dirname, '..', 'server.js');
+      console.log('[main] loading server from', serverPath);
       serverModule = require(serverPath);
-      console.log('[main] server module loaded from', serverPath);
+      console.log('[main] server module loaded');
     } catch (e) {
       return reject(new Error('Failed to load server: ' + e.message));
     }
@@ -189,8 +193,15 @@ function createWindow() {
 app.whenReady().then(async () => {
   try {
     await startServer();
+    console.log('[main] server started on port', actualPort);
   } catch (e) {
     console.error('[main] Server failed to start:', e.message);
+    // Show error dialog but still open window — user can connect to external server
+    const { dialog } = require('electron');
+    dialog.showErrorBox(
+      'VideoForge — Server Error',
+      `The built-in server failed to start:\n\n${e.message}\n\nThe app will open but transcoding will not work. Try restarting the app.`
+    );
   }
   createWindow();
 });

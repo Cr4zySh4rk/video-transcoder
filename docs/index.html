@@ -47,15 +47,59 @@
       </div>
 
       <div class="options-grid">
+        <!-- ── Video Settings ────────────────────────────────────── -->
         <div class="card">
           <div class="card-title">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
             Video Settings
           </div>
+
           <div class="field">
             <label>Encoder</label>
             <select id="encoder-select"><option value="libx264">Software x264 (CPU)</option></select>
           </div>
+
+          <div class="field">
+            <label>Container Format</label>
+            <select id="container-select">
+              <option value="mp4"  selected>MP4 — broadest device support</option>
+              <option value="mkv">MKV — multiple tracks, subtitles</option>
+              <option value="webm">WebM — browser-native (VP8/VP9/AV1)</option>
+              <option value="mov">MOV — Apple QuickTime</option>
+              <option value="avi">AVI — legacy compatibility</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Encoding Mode</label>
+            <select id="encoding-mode-select">
+              <option value="crf" selected>CRF — constant quality (recommended)</option>
+              <option value="bitrate">Target Bitrate — single-pass CBR</option>
+              <option value="two-pass">Two-Pass CBR — best bitrate accuracy</option>
+            </select>
+          </div>
+
+          <div class="field" id="crf-field">
+            <label>Quality (CRF) — lower = better quality, larger file</label>
+            <div class="slider-wrap">
+              <input type="range" id="crf-input" min="0" max="51" value="23" step="1" oninput="document.getElementById('crf-val').textContent=this.value" />
+              <span class="range-val" id="crf-val">23</span>
+            </div>
+          </div>
+
+          <div class="field" id="bitrate-field" style="display:none">
+            <label>Target Video Bitrate</label>
+            <select id="bitrate-select">
+              <option value="auto" selected>Auto by resolution (recommended)</option>
+              <option value="8000">8,000 kbps — 4K</option>
+              <option value="5000">5,000 kbps — 1080p</option>
+              <option value="2500">2,500 kbps — 720p</option>
+              <option value="1250">1,250 kbps — 480p</option>
+              <option value="800">800 kbps — 360p</option>
+              <option value="400">400 kbps — low bandwidth</option>
+            </select>
+          </div>
+
           <div class="field">
             <label>Speed / Quality Preset</label>
             <select id="preset-select">
@@ -70,13 +114,7 @@
               <option value="veryslow">Very Slow (best quality)</option>
             </select>
           </div>
-          <div class="field">
-            <label>Quality (CRF) — lower = better quality, larger file</label>
-            <div class="slider-wrap">
-              <input type="range" id="crf-input" min="0" max="51" value="23" step="1" oninput="document.getElementById('crf-val').textContent=this.value" />
-              <span class="range-val" id="crf-val">23</span>
-            </div>
-          </div>
+
           <div class="field">
             <label>Output Resolution</label>
             <select id="resolution-select">
@@ -88,18 +126,46 @@
               <option value="360p">360p — 640×360</option>
             </select>
           </div>
+
+          <div class="field">
+            <label>Frame Rate</label>
+            <select id="fps-select">
+              <option value="source" selected>Source (no change)</option>
+              <option value="60">60 fps</option>
+              <option value="30">30 fps</option>
+              <option value="25">25 fps (PAL)</option>
+              <option value="24">24 fps (cinema)</option>
+              <option value="23.976">23.976 fps</option>
+              <option value="15">15 fps</option>
+            </select>
+          </div>
+
           <div id="hw-badges"></div>
         </div>
 
+        <!-- ── Audio Settings ────────────────────────────────────── -->
         <div class="card">
           <div class="card-title">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
             Audio Settings
           </div>
+
           <div class="field">
             <label>Audio Track</label>
             <select id="audio-stream"><option value="0">Track 1 (default)</option></select>
           </div>
+
+          <div class="field">
+            <label>Audio Codec</label>
+            <select id="audio-codec-select">
+              <option value="aac"        selected>AAC — universal (recommended)</option>
+              <option value="libmp3lame">MP3 — wide compatibility</option>
+              <option value="libopus">   Opus — efficient (WebM/MKV)</option>
+              <option value="ac3">       AC-3 / Dolby Digital</option>
+              <option value="copy">      Copy (passthrough — no re-encode)</option>
+            </select>
+          </div>
+
           <div class="field">
             <label>Audio Bitrate</label>
             <select id="audio-bitrate">
@@ -109,6 +175,15 @@
               <option value="320k">320 kbps</option>
             </select>
           </div>
+
+          <div class="field">
+            <label>Subtitle Track</label>
+            <select id="subtitle-select">
+              <option value="-1">None</option>
+              <!-- populated from probe -->
+            </select>
+          </div>
+
           <div class="field">
             <label>Dialogue / Speech Level</label>
             <div class="slider-wrap">
@@ -118,6 +193,7 @@
             <div class="level-bar"><div class="level-fill dialogue" id="dialogue-level-bar" style="width:50%"></div></div>
             <div style="font-size:11px;color:var(--muted);margin-top:4px">Boosts the 300 Hz–4 kHz speech frequency band</div>
           </div>
+
           <div class="field">
             <label>Background Music / Score Level</label>
             <div class="slider-wrap">
@@ -127,6 +203,7 @@
             <div class="level-bar"><div class="level-fill bg-music" id="bg-level-bar" style="width:100%"></div></div>
             <div style="font-size:11px;color:var(--muted);margin-top:4px">Attenuates bass &amp; high-frequency (non-speech) bands</div>
           </div>
+
           <label class="toggle-row">
             <div><div class="toggle-label">Speech Enhancement</div><div class="toggle-sub">Multi-band compression + clarity EQ for dialogue</div></div>
             <div class="toggle"><input type="checkbox" id="speech-enhance" /><div class="toggle-thumb"></div></div>
@@ -135,6 +212,42 @@
             <div><div class="toggle-label">Normalize Audio (EBU R128)</div><div class="toggle-sub">Loudness normalisation to –16 LUFS</div></div>
             <div class="toggle"><input type="checkbox" id="normalize-audio" /><div class="toggle-thumb"></div></div>
           </label>
+        </div>
+      </div><!-- /options-grid -->
+
+      <!-- ── Trim ─────────────────────────────────────────────────── -->
+      <div class="trim-row" id="trim-row">
+        <div class="trim-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="6" y1="9" x2="6" y2="15"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+          Trim
+        </div>
+        <div class="trim-inputs">
+          <div class="trim-field">
+            <label>Start time</label>
+            <input type="text" id="trim-start" placeholder="0:00.000" spellcheck="false" pattern="\d*:?\d{1,2}[.:]\d{1,3}" title="e.g. 1:23.456 or 83.456" />
+          </div>
+          <div class="trim-sep">→</div>
+          <div class="trim-field">
+            <label>End time</label>
+            <input type="text" id="trim-end" placeholder="end" spellcheck="false" pattern="\d*:?\d{1,2}[.:]\d{1,3}" title="e.g. 4:56.789 or 296.789" />
+          </div>
+          <div class="trim-hint">MM:SS.mmm or total seconds</div>
+        </div>
+      </div>
+
+      <!-- ── Destination folder (Electron-only, hidden on web) ─────── -->
+      <div class="dest-row" id="dest-row" style="display:none">
+        <div class="dest-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Output Folder
+        </div>
+        <div class="dest-inner">
+          <span class="dest-path" id="dest-path">Same as source file</span>
+          <button class="btn btn-ghost btn-sm" id="dest-browse-btn">Browse…</button>
+          <button class="btn btn-ghost btn-sm" id="dest-clear-btn" style="display:none">✕ Reset</button>
+          <button class="btn btn-ghost btn-sm" id="dest-open-btn" style="display:none" title="Open folder">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </button>
         </div>
       </div>
 
@@ -150,14 +263,14 @@
       <div id="progress-section" style="display:none">
         <div class="progress-card">
           <div class="progress-header">
-            <span class="progress-title">Transcoding…</span>
+            <span class="progress-title" id="progress-title">Transcoding…</span>
             <span id="progress-pct" style="font-family:monospace;font-weight:700;color:var(--accent)">0%</span>
           </div>
           <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-bar"></div></div>
           <div class="progress-meta">
             <div class="progress-stat" id="progress-time">--:-- / --:--</div>
-            <div class="progress-stat" id="progress-speed">Speed <span>—</span></div>
-            <div class="progress-stat" id="progress-fps">FPS <span>—</span></div>
+            <div class="progress-stat" id="progress-speed">Speed <span>Analyzing…</span></div>
+            <div class="progress-stat" id="progress-fps">FPS <span>Analyzing…</span></div>
           </div>
         </div>
       </div>
@@ -167,7 +280,7 @@
           <div class="download-icon">✅</div>
           <div class="download-info">
             <h3>Transcode complete!</h3>
-            <p id="download-meta">Your web-optimized x264 MP4 is ready.</p>
+            <p id="download-meta">Your transcoded file is ready.</p>
           </div>
           <a class="btn btn-success btn-lg" id="download-link" href="#" download>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -202,6 +315,7 @@
       </div>
     </div><!-- /batch-panel -->
   </main>
+
   <!-- Get Started — always visible -->
   <section id="get-started">
     <div class="gs-inner">
@@ -226,6 +340,10 @@
         <button class="gs-tab" id="gs-lin" onclick="gsOS('lin')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0a12 12 0 1 0 0 24A12 12 0 0 0 12 0zm-.5 5.5c.8 0 1.5.7 1.5 1.5s-.7 1.5-1.5 1.5S10 7.8 10 7s.7-1.5 1.5-1.5zM17 18H7v-1l2-1V10H7V9h4v7l2 1v1h4v1z"/></svg>
           Linux
+        </button>
+        <button class="gs-tab" id="gs-and" onclick="gsOS('and')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.523 0a.5.5 0 0 0-.35.15l-1.61 1.61A8.5 8.5 0 0 0 12 1.5a8.5 8.5 0 0 0-3.563.76L6.827.15A.5.5 0 0 0 6.477 0a.5.5 0 0 0-.354.854l1.434 1.433A8.501 8.501 0 0 0 3.5 10h17a8.501 8.501 0 0 0-4.057-7.713L17.877.854A.5.5 0 0 0 17.523 0zM9 6.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm6 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zM3 11v7a2 2 0 0 0 2 2h.5v2.5a1.5 1.5 0 0 0 3 0V20h3v2.5a1.5 1.5 0 0 0 3 0V20H19a2 2 0 0 0 2-2v-7H3zm-1.5 0a1.5 1.5 0 0 0-1.5 1.5v4a1.5 1.5 0 0 0 3 0v-4A1.5 1.5 0 0 0 1.5 11zm21 0a1.5 1.5 0 0 0-1.5 1.5v4a1.5 1.5 0 0 0 3 0v-4a1.5 1.5 0 0 0-1.5-1.5z"/></svg>
+          Android
         </button>
       </div>
 
@@ -276,144 +394,6 @@
         </div>
       </div>
 
-      <!-- Server URL — always visible -->
-      <div class="gs-connect-row">
-        <div class="gs-connect-label">Server URL</div>
-        <div class="server-row">
-          <input id="server-url-input" type="text" placeholder="http://localhost:3000" spellcheck="false" />
-          <button class="btn btn-primary" id="connect-btn">Connect</button>
-        </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:5px">Change the port here if you edited the launcher script, then click Connect</div>
-      </div>
-
-      <!-- Retry callout -->
-      <div id="gs-retry-callout" style="display:none">
-        <div class="gs-retry-box">
-          <div class="gs-retry-icon">&#x26A1;</div>
-          <div class="gs-retry-text">
-            <strong>Server not reachable.</strong>
-            If you have already downloaded the launcher, run it now — then click Try Again.
-          </div>
-          <button class="btn btn-primary" onclick="retryConnect()">Try Again</button>
-        </div>
-      </div>
-
-      <div class="gs-alt">
-        Or download the <a href="https://github.com/Cr4zySh4rk/video-transcoder/releases" target="_blank">desktop app</a> — no Node.js or FFmpeg required.
-      </div>
-      </div><!-- /gs-body -->
-    </div>
-  </section>
-
-  <!-- About -->
-  <section id="about">
-    <div class="about-inner">
-      <div class="about-col">
-        <div class="about-logo">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-          VideoForge
-        </div>
-        <p class="about-desc">A free, open-source video transcoder that runs entirely on your own hardware. No cloud uploads. No limits.</p>
-        <div class="about-url-badge">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          <a href="https://cr4zysh4rk.github.io/video-transcoder/" target="_blank">cr4zysh4rk.github.io/video-transcoder</a>
-        </div>
-      </div>
-      <div class="about-col">
-        <div class="about-section-title">Features</div>
-        <ul class="about-list">
-          <li>Any input format &#x2192; x264 web-optimized MP4</li>
-          <li>NVIDIA, AMD, Intel &amp; Apple GPU acceleration</li>
-          <li>Dialogue / background audio level control</li>
-          <li>Batch transcode entire folders</li>
-          <li>Real-time progress via WebSocket</li>
-        </ul>
-      </div>
-      <div class="about-col">
-        <div class="about-section-title">Links</div>
-        <ul class="about-links">
-          <li><a href="https://github.com/Cr4zySh4rk/video-transcoder" target="_blank">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
-            Source on GitHub
-          </a></li>
-          <li><a href="https://github.com/Cr4zySh4rk/video-transcoder/releases" target="_blank">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Download Desktop App
-          </a></li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <footer>
-    <a href="https://cr4zysh4rk.github.io/video-transcoder/" target="_blank">cr4zysh4rk.github.io/video-transcoder</a>
-    &nbsp;&middot;&nbsp;
-    <a href="https://github.com/Cr4zySh4rk/video-transcoder" target="_blank">GitHub</a>
-    &nbsp;&middot;&nbsp; Powered by FFmpeg &amp; Node.js &nbsp;&middot;&nbsp; Runs on your hardware
-  </footer>
-
-</div><!-- /app -->
-<div id="toast-wrap"></div>
-
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script src="js/app.js"></script>
-<script>
-async function dlFile(btn, url, filename) {
-  var orig = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = 'Downloading…';
-  try {
-    var res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    var text = await res.text();
-    var inp  = document.getElementById('server-url-input');
-    var sUrl = (inp && inp.value.trim()) || 'http://localhost:3000';
-    var port = '3000';
-    try { port = new URL(sUrl).port || '3000'; } catch(e) {}
-    if (port !== '3000') {
-      text = text
-        .replace(/^(set PORT=)3000$/m,    '$1' + port)
-        .replace(/^(export PORT=)3000$/m, '$1' + port);
-    }
-    var blob    = new Blob([text], { type: 'application/octet-stream' });
-    var blobUrl = URL.createObjectURL(blob);
-    var a       = document.createElement('a');
-    a.href      = blobUrl;
-    a.download  = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 10000);
-  } catch(e) {
-    alert('Download failed: ' + e.message + '\n\nURL: ' + url);
-  } finally {
-    btn.disabled    = false;
-    btn.textContent = orig;
-  }
-}
-
-function gsOS(os) {
-  ['win','mac','lin'].forEach(function(id) {
-    var g = document.getElementById('gs-guide-' + id);
-    var t = document.getElementById('gs-' + id);
-    if (g) g.style.display = (id === os) ? 'block' : 'none';
-    if (t) t.classList.toggle('active', id === os);
-  });
-}
-
-function retryConnect() {
-  var url = document.getElementById('server-url-input').value.trim() || 'http://localhost:3000';
-  if (typeof connectToServer === 'function') connectToServer(url, true);
-}
-
-(function() {
-  var ua = navigator.userAgent.toLowerCase();
-  var os = ua.indexOf('win') !== -1 ? 'win' : ua.indexOf('mac') !== -1 ? 'mac' : 'lin';
-  gsOS(os);
-})();
-</script>
-<style>
-code { background:var(--surface2); border:1px solid var(--border); padding:2px 8px; border-radius:4px; font-size:12px; font-family:'SF Mono','Fira Code',monospace; }
-</style>
-</body>
-</html>
+      <div class="gs-guide" id="gs-guide-and" style="display:none">
+        <div class="gs-steps">
+          <div class="

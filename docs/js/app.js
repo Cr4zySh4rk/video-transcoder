@@ -253,28 +253,41 @@ function handleFile(file) {
     return;
   }
 
-  // Send only the first 2 MB (container header) — ffprobe reads stream info
-  // from the header alone so this is instant regardless of file size.
+  // ── Client-side probe (instant — no upload needed) ──────────────────────
+  // The browser already has the file. We create a blob URL, let the video
+  // element read its metadata, then revoke the URL immediately.
+  // Falls back to a 512 KB server probe for formats the browser can't parse
+  // (MKV, AVI, old TS, etc.).
   (async () => {
-    try {
-      const HEADER_BYTES = 2 * 1024 * 1024; // 2 MB
-      const chunk = file.slice(0, HEADER_BYTES);
-      const ext   = file.name.slice(file.name.lastIndexOf('.')) || '.mp4';
-      const fd    = new FormData();
-      fd.append('chunk', new File([chunk], 'header' + ext, { type: file.type }));
-
-      const r = await fetch(`${state.serverUrl}/api/probe-partial`, { method: 'POST', body: fd });
-      if (!r.ok) throw new Error(`Probe returned ${r.status}`);
-      const data = await r.json();
-      if (data.error) throw new Error(data.error);
-      renderProbeData(data);              // populate chips + audio select
+    const clientData = await probeClientSide(file);
+    if (clientData) {
+      renderProbeData(clientData);
       els.transcodeBtn.disabled = false;
-    } catch (e) {
-      console.warn('Partial probe failed:', e.message);
+      return;
+    }
+
+    // Browser couldn't parse format — send 512 KB header to server
+    if (!state.connected) {
       els.probeChips.innerHTML  = '';
       els.audioStream.innerHTML = '<option value="0">Track 1 (default)</option>';
       els.transcodeBtn.disabled = false;
+      return;
     }
+    try {
+      const ext  = file.name.slice(file.name.lastIndexOf('.')) || '.mkv';
+      const fd   = new FormData();
+      fd.append('chunk', new File([file.slice(0, 512 * 1024)], 'hdr' + ext, { type: file.type }));
+      const r = await fetch(`${state.serverUrl}/api/probe-partial`, { method: 'POST', body: fd });
+      if (!r.ok) throw new Error(r.status);
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
+      renderProbeData(data);
+    } catch (e) {
+      console.warn('Server probe failed:', e.message);
+      els.probeChips.innerHTML  = '';
+      els.audioStream.innerHTML = '<option value="0">Track 1 (default)</option>';
+    }
+    els.transcodeBtn.disabled = false;
   })();
 }
 
@@ -378,6 +391,73 @@ async function startTranscode() {
     toast(`Error: ${err.message}`, 'error');
     resetState();
   }
+}
+
+// ── Client-side probe using HTML5 video element ──────────────────────────
+// Returns a fake ffprobe-shaped object on success, or null if the browser
+// cannot parse the container (MKV, AVI, TS, etc.).
+function probeClientSide(file) {
+  return new Promise(resolve => {
+    const url   = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted   = true;
+
+    const cleanup = () => { URL.revokeObjectURL(url); video.src = ''; };
+
+    video.addEventListener('loadedmetadata', () => {
+      const streams = [];
+
+      // Video stream
+      if (video.videoWidth && video.videoHeight) {
+        streams.push({
+          codec_type: 'video',
+          codec_name: 'unknown',
+          width:  video.videoWidth,
+          height: video.videoHeight,
+        });
+      }
+
+      // Audio tracks — audioTracks API available in Chrome/Edge/Safari
+      const at = video.audioTracks;
+      if (at && at.length > 0) {
+        for (let i = 0; i < at.length; i++) {
+          const t = at[i];
+          streams.push({
+            codec_type: 'audio',
+            codec_name: '',
+            channels: null,
+            tags: {
+              language: t.language || null,
+              title:    t.label    || null,
+            }
+          });
+        }
+      } else if (video.videoWidth || video.duration) {
+        // Browser parsed the file but audioTracks not supported (Firefox).
+        // Add one generic audio entry — better than nothing.
+        streams.push({ codec_type: 'audio', codec_name: '', channels: null, tags: {} });
+      }
+
+      cleanup();
+      resolve({
+        streams,
+        format: {
+          duration: isFinite(video.duration) ? String(video.duration) : null,
+          size: String(file.size),
+        }
+      });
+    });
+
+    video.addEventListener('error', () => { cleanup(); resolve(null); });
+
+    // Timeout — if browser stalls for >2 s fall back to server probe
+    const timer = setTimeout(() => { cleanup(); resolve(null); }, 2000);
+    video.addEventListener('loadedmetadata', () => clearTimeout(timer), { once: true });
+    video.addEventListener('error',          () => clearTimeout(timer), { once: true });
+
+    video.src = url;
+  });
 }
 
 // Render ffprobe JSON data into the UI (chips + audio track selector).

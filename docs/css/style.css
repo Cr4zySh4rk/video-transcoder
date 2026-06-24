@@ -658,13 +658,16 @@ input[type="range"]:hover::-webkit-slider-thumb {
   color: var(--muted);
 }
 
-/* ── Footer ───────────────────────────────────────────────────────────── */
-footer {
-  text-align: center;
-  padding: 16px;
+/* ── About section ────────────────────────────────────────────────────── */
+#about {
   border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 12px;
+  background: var(--surface);
+  margin-top: 40px;
+  padding: 40px 24px;
 }
 
-footer a { color: var(--accent); text-decoration: none; }
+.about-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  grid-temp

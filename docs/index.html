@@ -326,61 +326,32 @@
 
   </main>
 
-  <footer>
-    <a href="https://github.com/Cr4zySh4rk/video-transcoder" target="_blank">GitHub</a>
-    &nbsp;·&nbsp; Powered by FFmpeg &amp; Node.js &nbsp;·&nbsp; Runs on your hardware
-  </footer>
-
-</div><!-- /app -->
-
-<div id="toast-wrap"></div>
-
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script src="js/app.js"></script>
-<script>
-// OS auto-detect for setup guide
-function showOS(os) {
-  ['win','mac','lin'].forEach(id => {
-    document.getElementById(`guide-${id}`).style.display = id === os ? 'block' : 'none';
-    document.getElementById(`os-${id}`).style.borderColor = id === os ? 'var(--accent)' : '';
-    document.getElementById(`os-${id}`).style.color       = id === os ? 'var(--accent)' : '';
-  });
-}
-
-// Auto-detect OS
-(function autoDetect() {
-  const ua = navigator.userAgent.toLowerCase();
-  if (ua.includes('win'))    showOS('win');
-  else if (ua.includes('mac')) showOS('mac');
-  else                         showOS('lin');
-})();
-</script>
-
-<style>
-/* Extra styles for setup guide */
-.step-list { display:flex; flex-direction:column; gap:12px; }
-.step {
-  display:flex; align-items:flex-start; gap:12px;
-  font-size:13px; line-height:1.6;
-}
-.step-num {
-  min-width:24px; height:24px;
-  background:rgba(79,142,247,.15);
-  border:1px solid rgba(79,142,247,.3);
-  color:var(--accent);
-  border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  font-size:11px; font-weight:700; flex-shrink:0;
-  margin-top:2px;
-}
-code {
-  background:var(--surface2);
-  border:1px solid var(--border);
-  padding:2px 8px;
-  border-radius:4px;
-  font-size:12px;
-  font-family:'SF Mono', 'Fira Code', monospace;
-}
-</style>
-</body>
-</html>
+  <!-- ── About section ──────────────────────────────────────────────── -->
+  <section id="about">
+    <div class="about-inner">
+      <div class="about-col">
+        <div class="about-logo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="23 7 16 12 23 17 23 7"/>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+          </svg>
+          VideoForge
+        </div>
+        <p class="about-desc">A free, open-source video transcoder that runs entirely on your own hardware. No uploads to the cloud. No limits.</p>
+        <div class="about-url-badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <a href="https://cr4zysh4rk.github.io/video-transcoder/" target="_blank">cr4zysh4rk.github.io/video-transcoder</a>
+        </div>
+      </div>
+      <div class="about-col">
+        <div class="about-section-title">Features</div>
+        <ul class="about-list">
+          <li>Any input format → x264 web-optimized MP4</li>
+          <li>NVIDIA, AMD, Intel &amp; Apple GPU acceleration</li>
+          <li>Dialogue/background audio level control</li>
+          <li>Batch transcode entire folders</li>
+          <li>Real-time progress via WebSocket</li>
+        </ul>
+      </div>
+      <div class="about-col">
+        <di

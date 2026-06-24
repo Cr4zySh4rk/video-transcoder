@@ -748,4 +748,266 @@ els.cancelBtn.addEventListener('click', async () => {
 });
 
 // ── Reset ─────────────────────────────────────────────────────────────────
-els.resetBtn.add
+els.resetBtn.addels.resetBtn.addEventListener('click', () => {
+  state.file        = null;
+  state.jobId       = null;
+  state.sourcePath  = null;
+  els.fileInput.value              = '';
+  els.fileInfo.classList.remove('visible');
+  els.probeChips.innerHTML         = '';
+  els.progressSection.style.display = 'none';
+  els.downloadSection.style.display = 'none';
+  els.transcodeBtn.disabled        = true;
+  els.trimStart.value              = '';
+  els.trimEnd.value                = '';
+  state.transcoding                = false;
+  els.subtitleSelect.innerHTML     = '<option value="-1">None</option>';
+  els.audioStream.innerHTML        = '<option value="0">Track 1 (default)</option>';
+});
+
+function resetState() {
+  state.transcoding = false;
+  els.transcodeBtn.disabled = false;
+  els.cancelBtn.disabled    = true;
+}
+
+// ── Server URL input ──────────────────────────────────────────────────────
+els.serverUrlInput.value = state.serverUrl;
+els.connectBtn.addEventListener('click', () => {
+  connectToServer(els.serverUrlInput.value.trim() || 'http://localhost:3000', true);
+});
+els.serverUrlInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') els.connectBtn.click();
+});
+
+// ── Mode switching ────────────────────────────────────────────────────────
+function switchMode(mode) {
+  $('single-panel').style.display = mode === 'single' ? '' : 'none';
+  $('batch-panel').style.display  = mode === 'batch'  ? '' : 'none';
+  $('tab-single').classList.toggle('active', mode === 'single');
+  $('tab-batch').classList.toggle('active',  mode === 'batch');
+}
+window.switchMode = switchMode;
+
+// ── Batch logic ───────────────────────────────────────────────────────────
+const batchState = {
+  files:   [],
+  items:   [],
+  batchId: null,
+  running: false
+};
+
+const batchEls = {
+  dropZone:  $('batch-drop-zone'),
+  fileInput: $('batch-file-input'),
+  queue:     $('batch-queue'),
+  queueList: $('batch-queue-list'),
+  queueTitle:$('batch-queue-title'),
+  summary:   $('batch-summary'),
+  startBtn:  $('batch-start-btn'),
+  cancelBtn: $('batch-cancel-btn'),
+  clearBtn:  $('batch-clear-btn'),
+};
+
+function addBatchFiles(files) {
+  const newFiles = Array.from(files).filter(f =>
+    f.type.startsWith('video/') ||
+    /\.(mkv|mov|avi|wmv|flv|webm|mp4|m4v|ts|mts|m2ts|3gp|ogv|vob)$/i.test(f.name)
+  );
+  if (!newFiles.length) { toast('No valid video files found', 'error'); return; }
+  batchState.files.push(...newFiles);
+  renderBatchQueue();
+  batchEls.startBtn.disabled = !state.connected || batchState.running;
+  batchEls.queue.style.display = 'block';
+}
+
+function renderBatchQueue() {
+  batchEls.queueTitle.textContent = `Queue (${batchState.files.length} file${batchState.files.length !== 1 ? 's' : ''})`;
+  batchEls.queueList.innerHTML = '';
+  batchState.files.forEach((f, i) => {
+    const item    = batchState.items[i] || {};
+    const status  = item.status  || 'pending';
+    const percent = item.percent || 0;
+    const dlUrl   = item.downloadUrl || null;
+    const statusIcon = { pending:'·', running:'▶', done:'✓', error:'✕', cancelled:'—' }[status] || '·';
+    const row = document.createElement('div');
+    row.className = 'queue-item';
+    row.id = `queue-item-${i}`;
+    row.innerHTML = `
+      <div class="queue-status ${status}">${statusIcon}</div>
+      <div class="queue-name" title="${f.name}">${f.name}</div>
+      <div class="queue-size">${formatBytes(f.size)}</div>
+      <div class="queue-progress">
+        <div class="queue-bar-wrap"><div class="queue-bar-fill" id="qbar-${i}" style="width:${percent}%"></div></div>
+        <div class="queue-pct" id="qpct-${i}">${status === 'done' ? '100%' : status === 'pending' ? '' : percent + '%'}</div>
+      </div>
+      <div class="queue-dl" id="qdl-${i}">
+        ${dlUrl ? `<a href="${state.serverUrl}${dlUrl}" download>Download</a>` : ''}
+      </div>`;
+    batchEls.queueList.appendChild(row);
+  });
+  const done  = batchState.items.filter(it => it && it.status === 'done').length;
+  const total = batchState.files.length;
+  if (total > 0) batchEls.summary.textContent = `${done} / ${total} done`;
+}
+
+function updateQueueItem(index, update) {
+  if (!batchState.items[index]) batchState.items[index] = {};
+  Object.assign(batchState.items[index], update);
+  const status  = batchState.items[index].status  || 'pending';
+  const percent = batchState.items[index].percent || 0;
+  const dlUrl   = batchState.items[index].downloadUrl || null;
+  const statusEl = document.querySelector(`#queue-item-${index} .queue-status`);
+  const barEl    = $(`qbar-${index}`);
+  const pctEl    = $(`qpct-${index}`);
+  const dlEl     = $(`qdl-${index}`);
+  if (statusEl) {
+    statusEl.className = `queue-status ${status}`;
+    statusEl.textContent = { pending:'·', running:'▶', done:'✓', error:'✕', cancelled:'—' }[status]||'·';
+  }
+  if (barEl) barEl.style.width = `${percent}%`;
+  if (pctEl) pctEl.textContent = status === 'done' ? '100%' : (percent > 0 ? percent + '%' : '');
+  if (dlEl && dlUrl) dlEl.innerHTML = `<a href="${state.serverUrl}${dlUrl}" download>Download</a>`;
+  const done  = batchState.items.filter(it => it && it.status === 'done').length;
+  batchEls.summary.textContent = `${done} / ${batchState.files.length} done`;
+}
+
+batchEls.dropZone.addEventListener('dragover', e => { e.preventDefault(); batchEls.dropZone.classList.add('drag-over'); });
+batchEls.dropZone.addEventListener('dragleave', () => batchEls.dropZone.classList.remove('drag-over'));
+batchEls.dropZone.addEventListener('drop', e => { e.preventDefault(); batchEls.dropZone.classList.remove('drag-over'); addBatchFiles(e.dataTransfer.files); });
+batchEls.fileInput.addEventListener('change', () => addBatchFiles(batchEls.fileInput.files));
+
+batchEls.startBtn.addEventListener('click', startBatch);
+
+async function startBatch() {
+  if (!state.connected) { toast('Not connected to server', 'error'); return; }
+  if (!batchState.files.length) { toast('No files in queue', 'error'); return; }
+  if (batchState.running) return;
+  batchState.running = true;
+  batchState.items   = [];
+  batchEls.startBtn.disabled  = true;
+  batchEls.cancelBtn.disabled = false;
+
+  toast(`Uploading ${batchState.files.length} files…`);
+  const formData = new FormData();
+  batchState.files.forEach(f => formData.append('videos', f));
+
+  let uploadRes;
+  try {
+    const r = await fetch(`${state.serverUrl}/api/batch-upload`, { method: 'POST', body: formData });
+    if (!r.ok) throw new Error('Upload failed');
+    uploadRes = await r.json();
+  } catch (e) {
+    toast(`Upload error: ${e.message}`, 'error');
+    batchState.running = false;
+    batchEls.startBtn.disabled = false;
+    return;
+  }
+
+  batchState.batchId = uploadRes.batchId;
+  uploadRes.items.forEach((it, i) => { batchState.items[i] = { jobId: it.jobId, status: 'queued', percent: 0 }; });
+  renderBatchQueue();
+  state.socket.emit('join', uploadRes.batchId);
+
+  const transcodeOpts = {
+    encoder:          els.encoderSelect.value,
+    container:        els.containerSelect.value,
+    audioCodec:       els.audioCodecSelect.value,
+    preset:           els.presetSelect.value,
+    crf:              parseInt(els.crfInput.value),
+    encodingMode:     els.encodingModeSelect.value,
+    videoBitrate:     els.bitrateSelect.value,
+    resolution:       els.resolutionSelect.value,
+    fps:              els.fpsSelect.value,
+    audioBitrate:     els.audioBitrate.value,
+    audioStreamIndex: 0,
+    subtitleIndex:    -1,
+    dialogueBoost:    parseFloat(els.dialogueSlider.value),
+    backgroundLevel:  parseFloat(els.bgSlider.value),
+    speechEnhance:    els.speechEnhance.checked,
+    normalize:        els.normalizeAudio.checked
+  };
+
+  toast(`Batch transcode started (${batchState.files.length} files)…`);
+  try {
+    await fetch(`${state.serverUrl}/api/batch-transcode`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ batchId: uploadRes.batchId, jobIds: uploadRes.items.map(it => it.jobId), transcodeOpts })
+    });
+  } catch (e) {
+    toast(`Batch start error: ${e.message}`, 'error');
+    batchState.running = false;
+  }
+}
+
+batchEls.cancelBtn.addEventListener('click', async () => {
+  if (!batchState.batchId) return;
+  const running = batchState.items.findIndex(it => it && it.status === 'running');
+  if (running >= 0 && batchState.items[running].jobId) {
+    await fetch(`${state.serverUrl}/api/cancel/${batchState.items[running].jobId}`, { method: 'POST' }).catch(() => {});
+  }
+  batchState.running = false;
+  batchEls.cancelBtn.disabled = true;
+  toast('Batch cancelled');
+});
+
+batchEls.clearBtn.addEventListener('click', () => {
+  if (batchState.running) { toast('Stop the batch first', 'error'); return; }
+  batchState.files  = [];
+  batchState.items  = [];
+  batchState.batchId = null;
+  batchEls.queue.style.display = 'none';
+  batchEls.startBtn.disabled   = true;
+  batchEls.fileInput.value     = '';
+});
+
+function attachBatchSocketEvents(socket) {
+  socket.on('batch:file-start', ({ index }) => { updateQueueItem(index, { status: 'running', percent: 0 }); });
+  socket.on('batch:progress',   ({ index, percent }) => { updateQueueItem(index, { percent }); });
+  socket.on('batch:file-done',  ({ index, downloadUrl }) => { updateQueueItem(index, { status: 'done', percent: 100, downloadUrl }); });
+  socket.on('batch:file-error', ({ index }) => { updateQueueItem(index, { status: 'error' }); });
+  socket.on('batch:done', ({ total }) => {
+    batchState.running = false;
+    batchEls.startBtn.disabled  = false;
+    batchEls.cancelBtn.disabled = true;
+    toast(`Batch complete — ${total} files transcoded`, 'success', 8000);
+  });
+}
+
+// ── Get Started collapse/expand ───────────────────────────────────────────
+function gsExpand(open) {
+  const gs   = $('get-started');
+  const body = $('gs-body');
+  const btn  = $('gs-toggle-btn');
+  if (!gs) return;
+  if (open) {
+    gs.classList.remove('gs-collapsed');
+    if (body) body.style.display = '';
+    if (btn)  btn.textContent = '▲ Hide';
+  } else {
+    gs.classList.add('gs-collapsed');
+    if (body) body.style.display = 'none';
+    if (btn)  btn.textContent = '▼ Show';
+  }
+}
+window.gsToggle = () => gsExpand($('get-started').classList.contains('gs-collapsed'));
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(async () => {
+  els.transcodeBtn.disabled   = true;
+  els.statusLabel.textContent = 'Connecting…';
+
+  const fallback = setTimeout(() => {
+    if (!state.connected) showNotConnected();
+  }, 5000);
+
+  const ok = await checkServer(state.serverUrl);
+  clearTimeout(fallback);
+
+  if (ok) {
+    showConnected(state.serverUrl);
+  } else {
+    showNotConnected();
+  }
+})();

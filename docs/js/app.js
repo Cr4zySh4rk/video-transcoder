@@ -401,24 +401,54 @@ async function probeFile(jobId) {
     if (fmt.duration) addChip(fmtTime(parseFloat(fmt.duration)), 'duration');
     if (fmt.size)     addChip(formatBytes(parseInt(fmt.size)), 'file size');
 
-    // Populate audio stream selector
+    // Populate audio stream selector with rich track info
     els.audioStream.innerHTML = '';
     aStreams.forEach((s, i) => {
-      const label = [
-        s.codec_name?.toUpperCase(),
-        s.channel_layout,
-        s.tags?.language ? `[${s.tags.language.toUpperCase()}]` : null
-      ].filter(Boolean).join(' ');
+      const parts = [];
+
+      // Codec
+      if (s.codec_name) parts.push(s.codec_name.toUpperCase());
+
+      // Channels
+      const ch = s.channels;
+      if (ch) {
+        const chLabel = ch === 1 ? 'Mono' : ch === 2 ? 'Stereo'
+          : ch === 6 ? '5.1' : ch === 8 ? '7.1' : `${ch}ch`;
+        parts.push(chLabel);
+      }
+
+      // Bitrate
+      if (s.bit_rate) {
+        parts.push(`${Math.round(parseInt(s.bit_rate) / 1000)} kbps`);
+      }
+
+      // Language
+      const lang = s.tags?.language;
+      if (lang && lang !== 'und') parts.push(`[${lang.toUpperCase()}]`);
+
+      // Title (e.g. "Director's Commentary", "English", "Surround")
+      const title = s.tags?.title || s.tags?.handler_name;
+      if (title && title.length < 40) parts.push(`"${title}"`);
+
+      const label = parts.join(' ') || `Stream ${s.index ?? i}`;
 
       const opt = document.createElement('option');
       opt.value = i;
-      opt.textContent = `Track ${i + 1}: ${label}`;
+      opt.textContent = `Track ${i + 1}  —  ${label}`;
       els.audioStream.appendChild(opt);
 
-      addChip(`Audio ${i+1}: ${label}`, 'audio');
+      addChip(`Track ${i + 1}: ${label}`, 'audio');
     });
 
     if (aStreams.length === 0) addChip('No audio', 'audio');
+    else if (aStreams.length > 1) {
+      // Highlight the selector so the user notices multiple tracks
+      els.audioStream.style.borderColor = 'rgba(99,102,241,.5)';
+      els.audioStream.title = `${aStreams.length} audio tracks detected — pick the one you want`;
+    } else {
+      els.audioStream.style.borderColor = '';
+      els.audioStream.title = '';
+    }
   } catch (e) {
     console.warn('Probe failed', e);
   }
